@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield
 } from 'lucide-react';
 
-// âââ Main Page âââ
+// ─── Main Page ───
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -72,7 +72,7 @@ export default function Home() {
       await signInWithMagicLink(loginEmail);
       setLoginSent(true);
     } catch (err: any) {
-      setLoginError(err.message || 'ë¡ê·¸ì¸ ìì²­ì ì¤í¨íìµëë¤.');
+      setLoginError(err.message || '로그인 요청에 실패했습니다.');
     } finally {
       setLoginLoading(false);
     }
@@ -85,16 +85,16 @@ export default function Home() {
           <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">í¸ëì¦ ì¸ìê´ë¦¬</h1>
-          <p className="text-sm text-gray-500 mb-6">ì´ìì§ìí ì ì¨ íë«í¼</p>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">핸디즈 인원관리</h1>
+          <p className="text-sm text-gray-500 mb-6">운영지원팀 전욨 플랫폼</p>
           {loginSent ? (
             <div>
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-600"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4z"/></svg>
               </div>
-              <p className="text-sm text-gray-700 font-medium mb-1">ë¡ê·¸ì¸ ë§í¬ë¥¼ ë°ì¡íìµëë¤</p>
-              <p className="text-xs text-gray-500 mb-4">{loginEmail} ë°ìí¸ì§í¨ì íì¸íì¸ì</p>
-              <button onClick={() => { setLoginSent(false); setLoginEmail(''); }} className="text-xs text-emerald-600 hover:underline">ë¤ë¥¸ ì´ë©ì¼ë¡ ë¤ì ìë</button>
+              <p className="text-sm text-gray-700 font-medium mb-1">로그인 링크를 발송했습니다</p>
+              <p className="text-xs text-gray-500 mb-4">{loginEmail} 받은편지함을 확인하세요</p>
+              <button onClick={() => { setLoginSent(false); setLoginEmail(''); }} className="text-xs text-emerald-600 hover:underline">다른 이메일로 다시 시도</button>
             </div>
           ) : (
             <form onSubmit={handleMagicLink}>
@@ -112,11 +112,11 @@ export default function Home() {
                 disabled={loginLoading}
                 className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
               >
-                {loginLoading ? 'ë°ì¡ ì¤...' : 'ë¡ê·¸ì¸ ë§í¬ ë°ê¸°'}
+                {loginLoading ? '발송 중...' : '로그인 링크 받기'}
               </button>
             </form>
           )}
-          <p className="text-xs text-gray-400 mt-4">@handys.co.kr ê³ì ë§ ì ê·¼ ê°ë¥</p>
+          <p className="text-xs text-gray-400 mt-4">@handys.co.kr 계정만 접근 가능</p>
         </div>
       </div>
     );
@@ -128,19 +128,19 @@ export default function Home() {
       <div className="flex items-center justify-center h-screen">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full mx-4 text-center">
           <Shield className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-gray-900 mb-2">ì ê·¼ ê¶í ìì</h2>
-          <p className="text-sm text-gray-500 mb-4">ê´ë¦¬ììê² ê¶íì ìì²­íì¸ì.<br/>{user.email}</p>
-          <button onClick={signOut} className="text-sm text-gray-500 hover:text-gray-700 underline">ë¡ê·¸ìì</button>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">접근 권한 없음</h2>
+          <p className="text-sm text-gray-500 mb-4">관리자에게 권한을 요청하세요.<br/>{user.email}</p>
+          <button onClick={signOut} className="text-sm text-gray-500 hover:text-gray-700 underline">로그아웃</button>
         </div>
       </div>
     );
   }
 
   const tabs = [
-    { id: 'board', label: 'ì¸ìë°°ì¹ë³´ë', icon: LayoutGrid },
-    { id: 'roster', label: 'ì¸ìë¦¬ì¤í¸', icon: Users },
-    { id: 'summary', label: 'ì¸ìíí©', icon: BarChart3 },
-    ...(isAdmin ? [{ id: 'settings', label: 'ì¤ì ', icon: Settings }] : []),
+    { id: 'board', label: '인원배치보드', icon: LayoutGrid },
+    { id: 'roster', label: '인원리스트', icon: Users },
+    { id: 'summary', label: '인원현황', icon: BarChart3 },
+    ...(isAdmin ? [{ id: 'settings', label: '설정', icon: Settings }] : []),
   ];
 
   return (
@@ -153,14 +153,14 @@ export default function Home() {
               <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-bold text-gray-900">í¸ëì¦ ì¸ìê´ë¦¬</h1>
-              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">ì´ìì§ìí</span>
+              <h1 className="text-lg font-bold text-gray-900">핸디즈 인원관리</h1>
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">운영지원팀</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  type="text" placeholder="ì´ë¦, ì§ì  ê²ì..." value={search}
+                  type="text" placeholder="이름, 지점 검색..." value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pl-9 pr-4 py-1.5 text-sm border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
@@ -203,18 +203,18 @@ export default function Home() {
   );
 }
 
-// âââ Board View âââ
+// ─── Board View ───
 function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => void;
 }) {
-  const [region, setRegion] = useState('ì ì²´');
+  const [region, setRegion] = useState('전체');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<{ branch: Branch; slotNum: number; employee?: Employee } | null>(null);
-  const regions = ['ì ì²´', 'ê°ì', 'ê²½ê¸°', 'ë¶ì¸ê²½', 'ìì¸', 'ì¸ì²', 'ì ì£¼'];
+  const regions = ['전체', '강원', '경기', '부울경', '서울', '인천', '제주'];
 
   const boardData = useMemo(() => {
     let filtered = branches;
-    if (region !== 'ì ì²´') filtered = filtered.filter(b => b.region === region);
+    if (region !== '전체') filtered = filtered.filter(b => b.region === region);
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(b => {
@@ -253,10 +253,10 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-4">
         {[
-          { l: 'ì´ TO', v: stats.totalTO, c: 'text-gray-900' },
-          { l: 'í ì¸ì', v: stats.filled, c: 'text-emerald-600' },
-          { l: 'ì±ì¨ íì', v: stats.hiring, c: 'text-red-600' },
-          { l: 'ê³µì', v: stats.vacancy, c: 'text-amber-600' },
+          { l: '총 TO', v: stats.totalTO, c: 'text-gray-900' },
+          { l: '현 인원', v: stats.filled, c: 'text-emerald-600' },
+          { l: '채욨 필요', v: stats.hiring, c: 'text-red-600' },
+          { l: '공석', v: stats.vacancy, c: 'text-amber-600' },
         ].map(s => (
           <div key={s.l} className="bg-white rounded-xl border p-3">
             <div className="text-xs text-gray-500 mb-1">{s.l}</div>
@@ -282,14 +282,14 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b">
-                <th className="text-left px-3 py-2.5 font-semibold text-gray-700 sticky left-0 bg-gray-50 min-w-[140px]">ì§ì </th>
+                <th className="text-left px-3 py-2.5 font-semibold text-gray-700 sticky left-0 bg-gray-50 min-w-[140px]">지점</th>
                 <th className="text-center px-2 py-2.5 font-semibold w-16">HM</th>
                 {[1,2,3,4,5,6,7,8,9].map(n => (
                   <th key={n} className="text-center px-1 py-2.5 font-semibold text-gray-400 min-w-[105px]">{n}</th>
                 ))}
                 <th className="text-center px-2 py-2.5 font-semibold w-14">TO</th>
-                <th className="text-center px-2 py-2.5 font-semibold w-14">íì</th>
-                <th className="text-left px-3 py-2.5 font-semibold min-w-[180px]">ë¹ê³ </th>
+                <th className="text-center px-2 py-2.5 font-semibold w-14">현원</th>
+                <th className="text-left px-3 py-2.5 font-semibold min-w-[180px]">비고</th>
               </tr>
             </thead>
             <tbody>
@@ -304,8 +304,8 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                         <div className="flex items-center gap-2">
                           {collapsed[rgn] ? <ChevronRight className="w-4 h-4 text-emerald-600" /> : <ChevronDown className="w-4 h-4 text-emerald-600" />}
                           <span className="font-bold text-emerald-800">{rgn}</span>
-                          <span className="text-xs text-emerald-600 bg-emerald-200 px-2 py-0.5 rounded-full">{items.length}ê° ì§ì </span>
-                          <span className="text-xs text-gray-500 ml-2">TO {rTO} / íì {rFill}</span>
+                          <span className="text-xs text-emerald-600 bg-emerald-200 px-2 py-0.5 rounded-full">{items.length}개 지점</span>
+                          <span className="text-xs text-gray-500 ml-2">TO {rTO} / 현원 {rFill}</span>
                         </div>
                       </td>
                     </tr>
@@ -399,14 +399,14 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
         });
       }
       onSaved();
-    } catch (e) { alert('ì ì¥ ì¤í¨'); }
+    } catch (e) { alert('저장 실패'); }
     setSaving(false);
   };
 
   const statusOptions = [
-    { key: 'active', label: 'ì¬ì§' }, { key: 'hiring', label: 'ì±ì©íì' },
-    { key: 'onboarding', label: 'ìì¬ëê¸°' }, { key: 'transfer', label: 'ì´ëìì ' },
-    { key: 'leave', label: 'í´ì§/ì¡ê°' },
+    { key: 'active', label: '재직' }, { key: 'hiring', label: '채용필요' },
+    { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동옄정' },
+    { key: 'leave', label: '휴직/육가' },
   ];
 
   return (
@@ -414,22 +414,22 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h3 className="font-bold text-gray-900">{employee ? 'ì¬ë¡¯ í¸ì§' : 'ì¸ì ë°°ì¹'}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{branch.name} - ì¬ë¡­ {slotNum}</p>
+            <h3 className="font-bold text-gray-900">{employee ? '슬롯 편집' : '인원 배치'}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{branch.name} - 슬롭 {slotNum}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <div className="p-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ìë¬¸ëª (English Name)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">영문명 (English Name)</label>
             <input value={engName} onChange={e => setEngName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g. Riley" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">íê¸ ì´ë¦</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g. ê¹ë¤ì " />
+            <label className="block text-sm font-medium text-gray-700 mb-1">한글 이름</label>
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g. 김다정" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ìí</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
             <div className="grid grid-cols-3 gap-2">
               {statusOptions.map(o => (
                 <button key={o.key} onClick={() => setStatus(o.key as any)}
@@ -440,15 +440,15 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ë©ëª¨</label>
-            <input value={note} onChange={e => setNote(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="ìì¬ì¼, í´ì¬ ìì  ë±" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+            <input value={note} onChange={e => setNote(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="입사일, 퇴사 예정 등" />
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">ì·¨ì</button>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
           <button onClick={handleSave} disabled={saving || !engName}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            <Save className="w-4 h-4" />{saving ? 'ì ì¥ì¤...' : 'ì ì¥'}
+            <Save className="w-4 h-4" />{saving ? '저장중...' : '저장'}
           </button>
         </div>
       </div>
@@ -456,7 +456,7 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
   );
 }
 
-// âââ Roster View âââ
+// ─── Roster View ───
 function RosterView({ branches, employees, search, canEdit, onRefresh }: {
   branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => void;
 }) {
@@ -474,7 +474,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
   }, [employees, search]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('í´ì¬ ì²ë¦¬íìê² ìµëê¹?')) return;
+    if (!confirm('퇴사 처리하시겠습니까?')) return;
     await supabase.from('employees').update({ status: 'resigned', resign_date: new Date().toISOString().split('T')[0] }).eq('id', id);
     onRefresh();
   };
@@ -483,13 +483,13 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">ì´ìíí¸ ì¸ìë¦¬ì¤í¸</h2>
-          <p className="text-sm text-gray-500">ì´ {filtered.length}ëª (í´ì¬ ì ì¸)</p>
+          <h2 className="text-lg font-bold text-gray-900">운영파트 인원리스트</h2>
+          <p className="text-sm text-gray-500">총 {filtered.length}명 (퇴사 제외)</p>
         </div>
         {canEdit && (
           <button onClick={() => setModal('new')}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
-            <Plus className="w-4 h-4" />ì ê· ë±ë¡
+            <Plus className="w-4 h-4" />신규 등록
           </button>
         )}
       </div>
@@ -498,12 +498,12 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              <th className="text-left px-4 py-3 font-semibold">ì´ë¦</th>
-              <th className="text-left px-4 py-3 font-semibold">ìë¬¸ëª</th>
-              <th className="text-left px-4 py-3 font-semibold">ì´ë©ì¼</th>
-              <th className="text-left px-4 py-3 font-semibold">ìì</th>
-              <th className="text-center px-4 py-3 font-semibold">ìí</th>
-              {canEdit && <th className="text-center px-4 py-3 font-semibold w-24">ê´ë¦¬</th>}
+              <th className="text-left px-4 py-3 font-semibold">이름</th>
+              <th className="text-left px-4 py-3 font-semibold">영문명</th>
+              <th className="text-left px-4 py-3 font-semibold">이메일</th>
+              <th className="text-left px-4 py-3 font-semibold">소속</th>
+              <th className="text-center px-4 py-3 font-semibold">상태</th>
+              {canEdit && <th className="text-center px-4 py-3 font-semibold w-24">관리</th>}
             </tr>
           </thead>
           <tbody>
@@ -530,7 +530,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                     emp.status === 'transfer' ? 'bg-purple-100 text-purple-700' :
                     emp.status === 'leave' ? 'bg-green-100 text-green-700' :
                     'bg-gray-100 text-gray-600'
-                  }`}>{emp.status === 'active' ? 'ì¬ì§' : emp.status === 'hiring' ? 'ì±ì©íì' : emp.status === 'onboarding' ? 'ìì¬ëê¸°' : emp.status === 'transfer' ? 'ì´ëìì ' : emp.status === 'leave' ? 'í´ì§' : emp.status}</span>
+                  }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status}</span>
                 </td>
                 {canEdit && (
                   <td className="px-4 py-3">
@@ -581,7 +581,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
         await supabase.from('employees').insert(payload);
       }
       onSaved();
-    } catch (e) { alert('ì ì¥ ì¤í¨'); }
+    } catch (e) { alert('저장 실패'); }
     setSaving(false);
   };
 
@@ -589,14 +589,14 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-bold text-gray-900">{employee ? 'ì¸ì ì ë³´ ìì ' : 'ì ê· ì¸ì ë±ë¡'}</h3>
+          <h3 className="font-bold text-gray-900">{employee ? '인원 정보 수정' : '신규 인원 등록'}</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <div className="p-4 space-y-3">
           {[
-            { k: 'name', l: 'ì´ë¦', ph: 'íê¸¸ë' },
-            { k: 'eng_name', l: 'ìë¬¸ëª', ph: 'Gildong' },
-            { k: 'email', l: 'ì´ë©ì¼', ph: 'gildong.hong@handys.co.kr' },
+            { k: 'name', l: '이름', ph: '홍길동' },
+            { k: 'eng_name', l: '영문명', ph: 'Gildong' },
+            { k: 'email', l: '이메일', ph: 'gildong.hong@handys.co.kr' },
           ].map(f => (
             <div key={f.k}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{f.l}</label>
@@ -605,10 +605,10 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
             </div>
           ))}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ìì ì§ì </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">소속 지점</label>
             <select value={form.branch_id} onChange={e => setForm(p => ({ ...p, branch_id: e.target.value ? Number(e.target.value) : '' as any }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-              <option value="">ë¯¼ë°°ì </option>
+              <option value="">민배정</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
@@ -619,10 +619,10 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">ì·¨ì</button>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
           <button onClick={handleSave} disabled={saving || !form.name || !form.eng_name}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            <Save className="w-4 h-4" />{saving ? 'ì ì¥ì¤...' : employee ? 'ìì ' : 'ë±ë¡'}
+            <Save className="w-4 h-4" />{saving ? '저장중...' : employee ? '수정' : '등록'}
           </button>
         </div>
       </div>
@@ -630,7 +630,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
   );
 }
 
-// âââ Summary View âââ
+// ─── Summary View ───
 function SummaryView({ branches, employees }: { branches: Branch[]; employees: Employee[] }) {
   const regionStats = useMemo(() => {
     const stats: Record<string, { branches: number; to: number; filled: number; hiring: number; onboarding: number; transfer: number; leave: number }> = {};
@@ -662,15 +662,15 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-4">ì¸ì íí© ìì½</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-4">인원 현황 요약</h2>
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
         {[
-          { l: 'ì´ ì§ì ', v: total.branches, u: 'ê°', bg: 'bg-gray-50' },
-          { l: 'ì´ TO', v: total.to, u: 'ëª', bg: 'bg-gray-50' },
-          { l: 'í ì¸ì', v: total.filled, u: 'ëª', bg: 'bg-emerald-50', c: 'text-emerald-700' },
-          { l: 'ì±ì© íì', v: total.hiring, u: 'ëª', bg: 'bg-red-50', c: 'text-red-700' },
-          { l: 'ìì¬ ëê¸°', v: total.onboarding, u: 'ëª', bg: 'bg-blue-50', c: 'text-blue-700' },
-          { l: 'ì´ë ìì ', v: total.transfer, u: 'ëª', bg: 'bg-purple-50', c: 'text-purple-700' },
+          { l: '총 지점', v: total.branches, u: '개', bg: 'bg-gray-50' },
+          { l: '총 TO', v: total.to, u: '명', bg: 'bg-gray-50' },
+          { l: '현 인원', v: total.filled, u: '명', bg: 'bg-emerald-50', c: 'text-emerald-700' },
+          { l: '채용 필요', v: total.hiring, u: '명', bg: 'bg-red-50', c: 'text-red-700' },
+          { l: '입사 대기', v: total.onboarding, u: '명', bg: 'bg-blue-50', c: 'text-blue-700' },
+          { l: '이동 예정', v: total.transfer, u: '명', bg: 'bg-purple-50', c: 'text-purple-700' },
         ].map(card => (
           <div key={card.l} className={`${card.bg} rounded-xl p-4 border`}>
             <div className="text-xs text-gray-500 mb-1">{card.l}</div>
@@ -683,8 +683,8 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              {['ì§ì­','ì§ì ì','ê¸°ì¤TO','íì¸ì','ê³¼ë¶ì¡±','ì±ì©íì','ìì¬ëê¸°','ì´ëìì ','ì¶©ìì¨'].map(h =>
-                <th key={h} className={`${h==='ì§ì­'?'text-left':'text-center'} px-4 py-3 font-semibold`}>{h}</th>
+              {['지역','지점수','기줔TO','현인원','과부족','채용필요','입사대기','이동예정','충월율'].map(h =>
+                <th key={h} className={`${h==='지역'?'text-left':'text-center'} px-4 py-3 font-semibold`}>{h}</th>
               )}
             </tr>
           </thead>
@@ -716,7 +716,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
           </tbody>
           <tfoot>
             <tr className="bg-gray-50 border-t-2 border-gray-300">
-              <td className="px-4 py-3 font-bold">í©ê³</td>
+              <td className="px-4 py-3 font-bold">합계</td>
               <td className="text-center px-4 py-3 font-bold">{total.branches}</td>
               <td className="text-center px-4 py-3 font-bold">{total.to}</td>
               <td className="text-center px-4 py-3 font-bold text-emerald-600">{total.filled}</td>
@@ -733,7 +733,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
   );
 }
 
-// âââ Settings View (Admin only) âââ
+// ─── Settings View (Admin only) ───
 function SettingsView() {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -750,7 +750,7 @@ function SettingsView() {
   const handleAdd = async () => {
     if (!newEmail || !newName) return;
     const { error } = await supabase.from('user_roles').insert({ email: newEmail, role: newRole, name: newName });
-    if (error) { alert('ì¶ê° ì¤í¨: ' + error.message); return; }
+    if (error) { alert('추가 실패: ' + error.message); return; }
     setShowAdd(false); setNewEmail(''); setNewName(''); setNewRole('viewer');
     const { data } = await supabase.from('user_roles').select('*').order('role');
     if (data) setRoles(data as UserRole[]);
@@ -763,7 +763,7 @@ function SettingsView() {
   };
 
   const handleDelete = async (email: string) => {
-    if (!confirm(`${email} ì¬ì©ìë¥¼ ì­ì íìê² ìµëê¹?`)) return;
+    if (!confirm(`${email} 사용자를 삭제하시겠습니까?`)) return;
     await supabase.from('user_roles').delete().eq('email', email);
     setRoles(roles.filter(r => r.email !== email));
   };
@@ -772,12 +772,12 @@ function SettingsView() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">ì¬ì©ì ê¶í ê´ë¦¬</h2>
-          <p className="text-sm text-gray-500">íë«í¼ ì ê·¼ ê¶íì ê´ë¦¬í©ëë¤</p>
+          <h2 className="text-lg font-bold text-gray-900">사용자 권한 관리</h2>
+          <p className="text-sm text-gray-500">플랫폼 접근 권한을 관리합니다</p>
         </div>
         <button onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
-          <Plus className="w-4 h-4" />ì¬ì©ì ì¶ê°
+          <Plus className="w-4 h-4" />사용자 추가
         </button>
       </div>
 
@@ -785,10 +785,10 @@ function SettingsView() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              <th className="text-left px-4 py-3 font-semibold">ì´ë¦</th>
-              <th className="text-left px-4 py-3 font-semibold">ì´ë©ì¼</th>
-              <th className="text-center px-4 py-3 font-semibold">ì­í </th>
-              <th className="text-center px-4 py-3 font-semibold w-24">ê´ë¦¬</th>
+              <th className="text-left px-4 py-3 font-semibold">이름</th>
+              <th className="text-left px-4 py-3 font-semibold">이메일</th>
+              <th className="text-center px-4 py-3 font-semibold">역할</th>
+              <th className="text-center px-4 py-3 font-semibold w-24">관리</th>
             </tr>
           </thead>
           <tbody>
@@ -822,19 +822,19 @@ function SettingsView() {
 
       {/* Role descriptions */}
       <div className="bg-white rounded-xl border p-4">
-        <h3 className="font-medium text-gray-900 mb-3">ì­í  ì¤ëª</h3>
+        <h3 className="font-medium text-gray-900 mb-3">역할 설명</h3>
         <div className="space-y-2 text-sm">
           <div className="flex items-start gap-3">
             <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Admin</span>
-            <span className="text-gray-600">ëª¨ë  ë°ì´í° ì¡°í/í¸ì§ + ì¬ì©ì ê¶í ê´ë¦¬ + ì§ì  ì¤ì </span>
+            <span className="text-gray-600">모든 데이터 조회/편집 + 사용자 권한 관리 + 지점 설정</span>
           </div>
           <div className="flex items-start gap-3">
             <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Editor</span>
-            <span className="text-gray-600">ëª¨ë  ë°ì´í° ì¡°í/í¸ì§ (ì¸ì ë±ë¡, ë°°ì¹ ë³ê²½, í´ì¬ ì²ë¦¬)</span>
+            <span className="text-gray-600">모든 데이터 조회/편집 (인원 등록, 배치 변경, 퇴사 처리)</span>
           </div>
           <div className="flex items-start gap-3">
             <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Viewer</span>
-            <span className="text-gray-600">ëª¨ë  ë°ì´í° ì¡°íë§ ê°ë¥ (í¸ì§ ë¶ê°)</span>
+            <span className="text-gray-600">모든 데이터 조회만 가능 (편집 불가)</span>
           </div>
         </div>
       </div>
@@ -844,35 +844,35 @@ function SettingsView() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAdd(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-bold text-gray-900">ì¬ì©ì ì¶ê°</h3>
+              <h3 className="font-bold text-gray-900">사용자 추가</h3>
               <button onClick={() => setShowAdd(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ì´ë¦</label>
-                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="íê¸¸ë"
+                <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="홍길동"
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ì´ë©ì¼</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
                 <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="gildong.hong@handys.co.kr"
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ì­í </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
                 <select value={newRole} onChange={e => setNewRole(e.target.value as any)}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                  <option value="viewer">Viewer (ì¡°íë§)</option>
-                  <option value="editor">Editor (í¸ì§ ê°ë¥)</option>
-                  <option value="admin">Admin (ì ì²´ ê´ë¦¬)</option>
+                  <option value="viewer">Viewer (조회만)</option>
+                  <option value="editor">Editor (편집 가능)</option>
+                  <option value="admin">Admin (전체 관리)</option>
                 </select>
               </div>
             </div>
             <div className="flex gap-2 p-4 border-t">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">ë·¨ì</button>
+              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">뷨소</button>
               <button onClick={handleAdd} disabled={!newEmail || !newName}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" />ì¶ê°
+                <Plus className="w-4 h-4" />추가
               </button>
             </div>
           </div>
