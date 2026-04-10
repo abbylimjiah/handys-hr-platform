@@ -52,16 +52,17 @@ export default function Home() {
     if (user && userRole) loadData();
   }, [user, userRole, loadData]);
 
+  // Login screen states (must be before any early returns per Rules of Hooks)
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginSent, setLoginSent] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const canEdit = userRole?.role === 'admin' || userRole?.role === 'editor';
   const isAdmin = userRole?.role === 'admin';
 
   if (loading) return <div className="flex items-center justify-center h-screen"><div className="text-gray-500">Loading...</div></div>;
 
-  // Login screen
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginSent, setLoginSent] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
