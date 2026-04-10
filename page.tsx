@@ -5,7 +5,7 @@ import { supabase, signInWithMagicLink, signOut, getUserRole } from '@/lib/supab
 import type { Branch, Employee, UserRole } from '@/lib/supabase';
 import {
   Search, Plus, Edit3, Trash2, Users, BarChart3, LayoutGrid, Settings,
-  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield
+  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin
 } from 'lucide-react';
 
 // ─── Main Page ───
@@ -735,6 +735,34 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
 
 // ─── Settings View (Admin only) ───
 function SettingsView() {
+  const [settingsTab, setSettingsTab] = useState<'users' | 'branches' | 'upload'>('users');
+  const settingsTabs = [
+    { id: 'users' as const, label: '사용자 권한', icon: Shield },
+    { id: 'branches' as const, label: '지점 관리', icon: MapPin },
+    { id: 'upload' as const, label: '일괄 업로드', icon: Upload },
+  ];
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        {settingsTabs.map(t => (
+          <button key={t.id} onClick={() => setSettingsTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition ${
+              settingsTab === t.id ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'
+            }`}>
+            <t.icon className="w-4 h-4" />{t.label}
+          </button>
+        ))}
+      </div>
+      {settingsTab === 'users' && <UserRolesSection />}
+      {settingsTab === 'branches' && <BranchManageSection />}
+      {settingsTab === 'upload' && <BulkUploadSection />}
+    </div>
+  );
+}
+
+// ─── User Roles Section ───
+function UserRolesSection() {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -780,17 +808,14 @@ function SettingsView() {
           <Plus className="w-4 h-4" />사용자 추가
         </button>
       </div>
-
       <div className="bg-white rounded-xl border overflow-hidden mb-6">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="text-left px-4 py-3 font-semibold">이름</th>
-              <th className="text-left px-4 py-3 font-semibold">이메일</th>
-              <th className="text-center px-4 py-3 font-semibold">역할</th>
-              <th className="text-center px-4 py-3 font-semibold w-24">관리</th>
-            </tr>
-          </thead>
+          <thead><tr className="bg-gray-50 border-b">
+            <th className="text-left px-4 py-3 font-semibold">이름</th>
+            <th className="text-left px-4 py-3 font-semibold">이메일</th>
+            <th className="text-center px-4 py-3 font-semibold">역할</th>
+            <th className="text-center px-4 py-3 font-semibold w-24">관리</th>
+          </tr></thead>
           <tbody>
             {roles.map(r => (
               <tr key={r.email} className="border-b hover:bg-gray-50">
@@ -809,8 +834,7 @@ function SettingsView() {
                   </select>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => handleDelete(r.email)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                  <button onClick={() => handleDelete(r.email)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -819,27 +843,6 @@ function SettingsView() {
           </tbody>
         </table>
       </div>
-
-      {/* Role descriptions */}
-      <div className="bg-white rounded-xl border p-4">
-        <h3 className="font-medium text-gray-900 mb-3">역할 설명</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-start gap-3">
-            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Admin</span>
-            <span className="text-gray-600">모든 데이터 조회/편집 + 사용자 권한 관리 + 지점 설정</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Editor</span>
-            <span className="text-gray-600">모든 데이터 조회/편집 (인원 등록, 배치 변경, 퇴사 처리)</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium w-16 text-center flex-shrink-0">Viewer</span>
-            <span className="text-gray-600">모든 데이터 조회만 가능 (편집 불가)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Add User Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAdd(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
@@ -848,34 +851,375 @@ function SettingsView() {
               <button onClick={() => setShowAdd(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
-                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="홍길동"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-                <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="gildong.hong@handys.co.kr"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
-                <select value={newRole} onChange={e => setNewRole(e.target.value as any)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                  <option value="viewer">Viewer (조회만)</option>
-                  <option value="editor">Editor (편집 가능)</option>
-                  <option value="admin">Admin (전체 관리)</option>
-                </select>
-              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="홍길동" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="gildong.hong@handys.co.kr" className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
+                <select value={newRole} onChange={e => setNewRole(e.target.value as any)} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="viewer">Viewer (조회만)</option><option value="editor">Editor (편집 가능)</option><option value="admin">Admin (전체 관리)</option>
+                </select></div>
             </div>
             <div className="flex gap-2 p-4 border-t">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">뷨소</button>
+              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
               <button onClick={handleAdd} disabled={!newEmail || !newName}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" />추가
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Branch Management Section ───
+function BranchManageSection() {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState({ branch_num: '', name: '', region: '서울', target_to: '5', note: '' });
+  const regions = ['강원', '경기', '부울경', '서울', '인천', '제주'];
+
+  const loadBranches = useCallback(async () => {
+    const { data } = await supabase.from('branches').select('*').order('branch_num');
+    if (data) setBranches(data as Branch[]);
+  }, []);
+
+  useEffect(() => { loadBranches(); }, [loadBranches]);
+
+  const resetForm = () => { setForm({ branch_num: '', name: '', region: '서울', target_to: '5', note: '' }); setEditId(null); setShowAdd(false); };
+
+  const handleSave = async () => {
+    const payload = { branch_num: Number(form.branch_num), name: form.name, region: form.region, target_to: Number(form.target_to), note: form.note };
+    if (editId) {
+      const { error } = await supabase.from('branches').update(payload).eq('id', editId);
+      if (error) { alert('수정 실패: ' + error.message); return; }
+    } else {
+      const { error } = await supabase.from('branches').insert(payload);
+      if (error) { alert('추가 실패: ' + error.message); return; }
+    }
+    resetForm(); loadBranches();
+  };
+
+  const handleEdit = (b: Branch) => {
+    setForm({ branch_num: String(b.branch_num), name: b.name, region: b.region, target_to: String(b.target_to), note: b.note || '' });
+    setEditId(b.id); setShowAdd(true);
+  };
+
+  const handleDelete = async (b: Branch) => {
+    if (!confirm(`"${b.name}" 지점을 삭제하시겠습니까? 배치된 인원 데이터에 영향을 줄 수 있습니다.`)) return;
+    await supabase.from('branches').delete().eq('id', b.id);
+    loadBranches();
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">지점 관리</h2>
+          <p className="text-sm text-gray-500">지점 추가, 수정, 삭제</p>
+        </div>
+        <button onClick={() => { resetForm(); setShowAdd(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
+          <Plus className="w-4 h-4" />지점 추가
+        </button>
+      </div>
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 border-b">
+            <th className="text-center px-3 py-3 font-semibold w-16">#</th>
+            <th className="text-left px-4 py-3 font-semibold">지점명</th>
+            <th className="text-center px-4 py-3 font-semibold">지역</th>
+            <th className="text-center px-4 py-3 font-semibold w-16">TO</th>
+            <th className="text-left px-4 py-3 font-semibold">비고</th>
+            <th className="text-center px-4 py-3 font-semibold w-24">관리</th>
+          </tr></thead>
+          <tbody>
+            {branches.map(b => (
+              <tr key={b.id} className="border-b hover:bg-gray-50">
+                <td className="text-center px-3 py-2.5 text-gray-400 text-xs">{b.branch_num}</td>
+                <td className="px-4 py-2.5 font-medium">{b.name}</td>
+                <td className="text-center px-4 py-2.5"><span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{b.region}</span></td>
+                <td className="text-center px-4 py-2.5 font-bold">{b.target_to}</td>
+                <td className="px-4 py-2.5 text-xs text-gray-500">{b.note}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center justify-center gap-1">
+                    <button onClick={() => handleEdit(b)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(b)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={resetForm}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-bold text-gray-900">{editId ? '지점 수정' : '지점 추가'}</h3>
+              <button onClick={resetForm} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">지점번호</label>
+                  <input type="number" value={form.branch_num} onChange={e => setForm(p => ({ ...p, branch_num: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="1" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">기준 TO</label>
+                  <input type="number" value={form.target_to} onChange={e => setForm(p => ({ ...p, target_to: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="5" /></div>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">지점명</label>
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="강남 시그니티" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">지역</label>
+                <select value={form.region} onChange={e => setForm(p => ({ ...p, region: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">비고</label>
+                <input value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="메모" /></div>
+            </div>
+            <div className="flex gap-2 p-4 border-t">
+              <button onClick={resetForm} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
+              <button onClick={handleSave} disabled={!form.name || !form.branch_num}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                <Save className="w-4 h-4" />{editId ? '수정' : '추가'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Bulk Upload Section ───
+function BulkUploadSection() {
+  const [uploadType, setUploadType] = useState<'employees' | 'branches'>('employees');
+  const [textInput, setTextInput] = useState('');
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<{ success: number; fail: number; errors: string[] } | null>(null);
+
+  const parseEmployees = (text: string) => {
+    // Parse "한글이름EngName" pairs from continuous text or line-by-line
+    const items: { name: string; eng_name: string }[] = [];
+    // Try line-by-line first (tab or comma separated)
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const isTabular = lines.some(l => l.includes('\t') || l.includes(','));
+
+    if (isTabular) {
+      lines.forEach(line => {
+        const parts = line.split(/[\t,]+/).map(s => s.trim());
+        if (parts.length >= 2) {
+          items.push({ name: parts[0], eng_name: parts[1] });
+        }
+      });
+    } else {
+      // Continuous text: Korean name followed by English name
+      const joined = lines.join('');
+      const regex = /([\uAC00-\uD7AF]{2,4})([A-Za-z][A-Za-z ]*?)(?=[\uAC00-\uD7AF]|$)/g;
+      let match;
+      while ((match = regex.exec(joined)) !== null) {
+        items.push({ name: match[1], eng_name: match[2].trim() });
+      }
+      // Also catch standalone English names at the end
+      const remaining = joined.replace(regex, '');
+      const engOnly = remaining.match(/([A-Z][a-z]+)/g);
+      if (engOnly) {
+        engOnly.forEach(name => {
+          if (!items.some(i => i.eng_name === name)) {
+            items.push({ name: '', eng_name: name });
+          }
+        });
+      }
+    }
+    return items;
+  };
+
+  const parseBranches = (text: string) => {
+    // Parse "번호지점명" pairs from continuous text or line-by-line
+    const items: { branch_num: number; name: string }[] = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const isTabular = lines.some(l => l.includes('\t') || l.includes(','));
+
+    if (isTabular) {
+      lines.forEach(line => {
+        const parts = line.split(/[\t,]+/).map(s => s.trim());
+        if (parts.length >= 2 && !isNaN(Number(parts[0]))) {
+          items.push({ branch_num: Number(parts[0]), name: parts[1] });
+        }
+      });
+    } else {
+      // Continuous: number followed by name until next number
+      const joined = lines.join('\n');
+      const regex = /(\d+)\s*([^\d\n]+?)(?=\d|\n*$)/g;
+      let match;
+      while ((match = regex.exec(joined)) !== null) {
+        items.push({ branch_num: Number(match[1]), name: match[2].trim() });
+      }
+    }
+    return items;
+  };
+
+  const handleParse = () => {
+    setResult(null);
+    if (uploadType === 'employees') {
+      setParsed(parseEmployees(textInput));
+    } else {
+      setParsed(parseBranches(textInput));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (parsed.length === 0) return;
+    setUploading(true);
+    let success = 0, fail = 0;
+    const errors: string[] = [];
+
+    if (uploadType === 'employees') {
+      // Batch insert employees
+      const payload = parsed.map((p: any) => ({
+        name: p.name || '',
+        eng_name: p.eng_name,
+        status: 'active' as const,
+      }));
+      // Insert in batches of 50
+      for (let i = 0; i < payload.length; i += 50) {
+        const batch = payload.slice(i, i + 50);
+        const { error, data } = await supabase.from('employees').insert(batch).select();
+        if (error) { fail += batch.length; errors.push(`Row ${i+1}~${i+batch.length}: ${error.message}`); }
+        else { success += (data?.length || 0); }
+      }
+    } else {
+      // Insert branches one by one to catch duplicates
+      for (const p of parsed) {
+        const { error } = await supabase.from('branches').insert({
+          branch_num: (p as any).branch_num,
+          name: (p as any).name,
+          region: '미지정',
+          target_to: 5,
+          note: '',
+        });
+        if (error) { fail++; errors.push(`#${(p as any).branch_num} ${(p as any).name}: ${error.message}`); }
+        else { success++; }
+      }
+    }
+
+    setResult({ success, fail, errors });
+    setUploading(false);
+  };
+
+  const handleRemoveItem = (idx: number) => {
+    setParsed(p => p.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">일괄 업로드</h2>
+          <p className="text-sm text-gray-500">인원 또는 지점 데이터를 텍스트로 붙여넣어 한번에 등록</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setUploadType('employees'); setParsed([]); setResult(null); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'employees' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
+            <Users className="w-3.5 h-3.5 inline mr-1" />인원
+          </button>
+          <button onClick={() => { setUploadType('branches'); setParsed([]); setResult(null); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'branches' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
+            <MapPin className="w-3.5 h-3.5 inline mr-1" />지점
+          </button>
+        </div>
+      </div>
+
+      {/* Input area */}
+      <div className="bg-white rounded-xl border p-4 mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {uploadType === 'employees' ? '인원 데이터 붙여넣기' : '지점 데이터 붙여넣기'}
+        </label>
+        <p className="text-xs text-gray-400 mb-2">
+          {uploadType === 'employees'
+            ? '형식: 이름,영문명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (홍길동Gildong김영희Young...)'
+            : '형식: 번호,지점명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (1HQ2서면4명동...)'}
+        </p>
+        <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
+          rows={8} className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-y"
+          placeholder={uploadType === 'employees' ? '우민주MJ\n이세아Claire\n...' : '1HQ\n2서면\n4명동\n...'} />
+        <div className="flex gap-2 mt-3">
+          <button onClick={handleParse} disabled={!textInput.trim()}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            미리보기 파싱
+          </button>
+          {parsed.length > 0 && (
+            <button onClick={() => { setParsed([]); setResult(null); }}
+              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">초기화</button>
+          )}
+        </div>
+      </div>
+
+      {/* Preview */}
+      {parsed.length > 0 && (
+        <div className="bg-white rounded-xl border overflow-hidden mb-4">
+          <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">파싱 결과: {parsed.length}건</span>
+            <button onClick={handleUpload} disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+              <Upload className="w-4 h-4" />{uploading ? '업로드 중...' : `${parsed.length}건 일괄 등록`}
+            </button>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-50 border-b sticky top-0">
+                {uploadType === 'employees' ? (
+                  <><th className="text-left px-4 py-2 font-semibold">#</th>
+                    <th className="text-left px-4 py-2 font-semibold">이름</th>
+                    <th className="text-left px-4 py-2 font-semibold">영문명</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
+                ) : (
+                  <><th className="text-center px-4 py-2 font-semibold w-16">번호</th>
+                    <th className="text-left px-4 py-2 font-semibold">지점명</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
+                )}
+              </tr></thead>
+              <tbody>
+                {parsed.map((item, idx) => (
+                  <tr key={idx} className="border-b hover:bg-gray-50">
+                    {uploadType === 'employees' ? (
+                      <><td className="px-4 py-2 text-gray-400 text-xs">{idx + 1}</td>
+                        <td className="px-4 py-2 font-medium">{(item as any).name || <span className="text-gray-300">-</span>}</td>
+                        <td className="px-4 py-2">{(item as any).eng_name}</td></>
+                    ) : (
+                      <><td className="text-center px-4 py-2 text-gray-400">{(item as any).branch_num}</td>
+                        <td className="px-4 py-2 font-medium">{(item as any).name}</td></>
+                    )}
+                    <td className="text-center px-4 py-2">
+                      <button onClick={() => handleRemoveItem(idx)} className="p-1 text-gray-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {result && (
+        <div className={`rounded-xl border p-4 ${result.fail > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-sm font-bold text-emerald-700">성공: {result.success}건</span>
+            {result.fail > 0 && <span className="text-sm font-bold text-red-600">실패: {result.fail}건</span>}
+          </div>
+          {result.errors.length > 0 && (
+            <div className="text-xs text-red-600 space-y-1 mt-2">
+              {result.errors.map((e, i) => <div key={i}>{e}</div>)}
+            </div>
+          )}
         </div>
       )}
     </div>
