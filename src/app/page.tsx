@@ -85,7 +85,7 @@ export default function Home() {
           <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">핸디즈 인원관리</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">핸디즈 인사관리</h1>
           <p className="text-sm text-gray-500 mb-6">운영지원팀 전용 플랫폼</p>
           {loginSent ? (
             <div>
@@ -153,7 +153,7 @@ export default function Home() {
               <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-bold text-gray-900">핸디즈 인원관리</h1>
+              <h1 className="text-lg font-bold text-gray-900">핸디즈 인사관리</h1>
               <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">운영지원팀</span>
             </div>
             <div className="flex items-center gap-3">
