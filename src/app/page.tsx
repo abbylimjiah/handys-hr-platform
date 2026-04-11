@@ -426,6 +426,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       {modal && (
         <SlotModal
           branch={modal.branch} slotNum={modal.slotNum} employee={modal.employee}
+          isHmSlot={modal.branch.region === 'HQ' && modal.slotNum === 0}
           employees={employees} onClose={() => setModal(null)} onSaved={() => { setModal(null); onRefresh(); }}
         />
       )}
@@ -433,9 +434,9 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   );
 }
 
-function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
-  branch: Branch; slotNum: number; employee?: Employee; employees: Employee[];
-  onClose: () => void; onSaved: () => void;
+function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, onSaved }: {
+  branch: Branch; slotNum: number; employee?: Employee; isHmSlot?: boolean;
+  employees: Employee[]; onClose: () => void; onSaved: () => void;
 }) {
   const [engName, setEngName] = useState(employee?.eng_name || '');
   const [name, setName] = useState(employee?.name || '');
@@ -445,17 +446,16 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
+    const payload = {
+      eng_name: engName, name, status, status_note: note,
+      branch_id: branch.id, slot_number: slotNum,
+      is_hm: isHmSlot || false,
+    };
     if (employee) {
-      const { error } = await supabase.from('employees').update({
-        eng_name: engName, name, status, status_note: note,
-        branch_id: branch.id, slot_number: slotNum
-      }).eq('id', employee.id);
+      const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
       if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
     } else {
-      const { error } = await supabase.from('employees').insert({
-        eng_name: engName, name, status, status_note: note,
-        branch_id: branch.id, slot_number: slotNum
-      });
+      const { error } = await supabase.from('employees').insert(payload);
       if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
     }
     onSaved();
