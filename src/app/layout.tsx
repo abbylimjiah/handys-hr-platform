@@ -2,8 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '핵디즈 인원관리',
-  description: '운영지원팀 인원관리 플랫폼',
+  title: '핸디즈 인사관리',
+  description: '운영지원팀 인사관리 플랫폼',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
