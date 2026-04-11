@@ -5,7 +5,7 @@ import { supabase, signInWithMagicLink, signOut, getUserRole } from '@/lib/supab
 import type { Branch, Employee, UserRole } from '@/lib/supabase';
 import {
   Search, Plus, Edit3, Trash2, Users, BarChart3, LayoutGrid, Settings,
-  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin
+  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin, FileSpreadsheet
 } from 'lucide-react';
 
 // ─── Main Page ───
@@ -210,7 +210,8 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   const [region, setRegion] = useState('전체');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<{ branch: Branch; slotNum: number; employee?: Employee } | null>(null);
-  const regions = ['전체', '강원', '경기', '부울경', '서울', '인천', '제주'];
+  const regions = ['전체', 'HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
+  const regionOrder = ['HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
 
   const boardData = useMemo(() => {
     let filtered = branches;
@@ -224,14 +225,20 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       });
     }
     // Group by region
+    // Group by region, ordered with HQ first
     const groups: Record<string, (Branch & { emps: Employee[]; hm?: Employee })[]> = {};
+    regionOrder.forEach(r => { /* pre-seed order */ });
     filtered.forEach(b => {
       if (!groups[b.region]) groups[b.region] = [];
       const emps = employees.filter(e => e.branch_id === b.id && e.status !== 'resigned');
       const hm = emps.find(e => e.is_hm);
       groups[b.region].push({ ...b, emps, hm });
     });
-    return groups;
+    // Sort: HQ first, then alphabetical by regionOrder
+    const sorted: Record<string, typeof groups[string]> = {};
+    regionOrder.forEach(r => { if (groups[r]) sorted[r] = groups[r]; });
+    Object.keys(groups).forEach(r => { if (!sorted[r]) sorted[r] = groups[r]; });
+    return sorted;
   }, [branches, employees, region, search]);
 
   const stats = useMemo(() => {
@@ -880,7 +887,7 @@ function BranchManageSection() {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({ branch_num: '', name: '', region: '서울', target_to: '5', note: '' });
-  const regions = ['강원', '경기', '부울경', '서울', '인천', '제주'];
+  const regions = ['HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
 
   const loadBranches = useCallback(async () => {
     const { data } = await supabase.from('branches').select('*').order('branch_num');
@@ -1000,79 +1007,155 @@ function BranchManageSection() {
 // ─── Bulk Upload Section ───
 function BulkUploadSection() {
   const [uploadType, setUploadType] = useState<'employees' | 'branches'>('employees');
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('file');
   const [textInput, setTextInput] = useState('');
   const [parsed, setParsed] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ success: number; fail: number; errors: string[] } | null>(null);
+  const [defaultRegion, setDefaultRegion] = useState('HQ');
+  const regions = ['HQ', 'ê°ì', 'ê²½ê¸°', 'ë¶ì¸ê²½', 'ìì¸', 'ì¸ì²', 'ì ì£¼'];
 
   const parseEmployees = (text: string) => {
-    // Parse "한글이름EngName" pairs from continuous text or line-by-line
     const items: { name: string; eng_name: string }[] = [];
-    // Try line-by-line first (tab or comma separated)
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const isTabular = lines.some(l => l.includes('\t') || l.includes(','));
-
     if (isTabular) {
       lines.forEach(line => {
         const parts = line.split(/[\t,]+/).map(s => s.trim());
-        if (parts.length >= 2) {
-          items.push({ name: parts[0], eng_name: parts[1] });
-        }
+        if (parts.length >= 2) items.push({ name: parts[0], eng_name: parts[1] });
       });
     } else {
-      // Continuous text: Korean name followed by English name
       const joined = lines.join('');
       const regex = /([\uAC00-\uD7AF]{2,4})([A-Za-z][A-Za-z ]*?)(?=[\uAC00-\uD7AF]|$)/g;
       let match;
-      while ((match = regex.exec(joined)) !== null) {
-        items.push({ name: match[1], eng_name: match[2].trim() });
-      }
-      // Also catch standalone English names at the end
-      const remaining = joined.replace(regex, '');
-      const engOnly = remaining.match(/([A-Z][a-z]+)/g);
-      if (engOnly) {
-        engOnly.forEach(name => {
-          if (!items.some(i => i.eng_name === name)) {
-            items.push({ name: '', eng_name: name });
-          }
-        });
-      }
+      while ((match = regex.exec(joined)) !== null) items.push({ name: match[1], eng_name: match[2].trim() });
     }
     return items;
   };
 
   const parseBranches = (text: string) => {
-    // Parse "번호지점명" pairs from continuous text or line-by-line
     const items: { branch_num: number; name: string }[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const isTabular = lines.some(l => l.includes('\t') || l.includes(','));
-
     if (isTabular) {
       lines.forEach(line => {
         const parts = line.split(/[\t,]+/).map(s => s.trim());
-        if (parts.length >= 2 && !isNaN(Number(parts[0]))) {
-          items.push({ branch_num: Number(parts[0]), name: parts[1] });
-        }
+        if (parts.length >= 2 && !isNaN(Number(parts[0]))) items.push({ branch_num: Number(parts[0]), name: parts[1] });
       });
     } else {
-      // Continuous: number followed by name until next number
       const joined = lines.join('\n');
       const regex = /(\d+)\s*([^\d\n]+?)(?=\d|\n*$)/g;
       let match;
-      while ((match = regex.exec(joined)) !== null) {
-        items.push({ branch_num: Number(match[1]), name: match[2].trim() });
-      }
+      while ((match = regex.exec(joined)) !== null) items.push({ branch_num: Number(match[1]), name: match[2].trim() });
     }
     return items;
   };
 
   const handleParse = () => {
     setResult(null);
-    if (uploadType === 'employees') {
-      setParsed(parseEmployees(textInput));
-    } else {
-      setParsed(parseBranches(textInput));
+    if (uploadType === 'employees') setParsed(parseEmployees(textInput));
+    else setParsed(parseBranches(textInput));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setResult(null);
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    if (ext === 'csv' || ext === 'tsv') {
+      const text = await file.text();
+      const sep = ext === 'tsv' ? '\t' : ',';
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return;
+      const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/["\ufeff]/g, ''));
+      const rows = lines.slice(1);
+
+      if (uploadType === 'employees') {
+        const nameIdx = headers.findIndex(h => h === 'ì´ë¦' || h === 'name' || h === 'íê¸ëª');
+        const engIdx = headers.findIndex(h => h === 'ìë¬¸ëª' || h === 'eng_name' || h === 'english' || h === 'ìë¬¸ì´ë¦');
+        const emailIdx = headers.findIndex(h => h === 'ì´ë©ì¼' || h === 'email');
+        const branchIdx = headers.findIndex(h => h === 'ì§ì ' || h === 'branch' || h === 'ì§ì ëª');
+        const statusIdx = headers.findIndex(h => h === 'ìí' || h === 'status');
+
+        const items = rows.map(row => {
+          const cols = row.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+          return {
+            name: nameIdx >= 0 ? cols[nameIdx] : cols[0] || '',
+            eng_name: engIdx >= 0 ? cols[engIdx] : cols[1] || '',
+            email: emailIdx >= 0 ? cols[emailIdx] : '',
+            branch_name: branchIdx >= 0 ? cols[branchIdx] : '',
+            status: statusIdx >= 0 ? cols[statusIdx] : 'active',
+          };
+        }).filter(i => i.name || i.eng_name);
+        setParsed(items);
+      } else {
+        const numIdx = headers.findIndex(h => h === 'ë²í¸' || h === 'num' || h === 'branch_num' || h === '#');
+        const nameIdx = headers.findIndex(h => h === 'ì§ì ëª' || h === 'name' || h === 'ì´ë¦');
+        const regionIdx = headers.findIndex(h => h === 'ì§ì­' || h === 'region');
+        const toIdx = headers.findIndex(h => h === 'to' || h === 'target' || h === 'ëª©íì¸ì');
+
+        const items = rows.map(row => {
+          const cols = row.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+          return {
+            branch_num: numIdx >= 0 ? Number(cols[numIdx]) : 0,
+            name: nameIdx >= 0 ? cols[nameIdx] : cols[0] || '',
+            region: regionIdx >= 0 ? cols[regionIdx] : defaultRegion,
+            target_to: toIdx >= 0 ? Number(cols[toIdx]) || 5 : 5,
+          };
+        }).filter(i => i.name);
+        setParsed(items);
+      }
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      // Load SheetJS dynamically
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.onload = () => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const XLSX = (window as any).XLSX;
+          const wb = XLSX.read(ev.target?.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          if (data.length < 2) return;
+
+          const headers = data[0].map((h: any) => String(h || '').trim().toLowerCase());
+          const rows = data.slice(1).filter((r: any[]) => r.some(c => c != null && c !== ''));
+
+          if (uploadType === 'employees') {
+            const nameIdx = headers.findIndex((h: string) => h === 'ì´ë¦' || h === 'name' || h === 'íê¸ëª');
+            const engIdx = headers.findIndex((h: string) => h === 'ìë¬¸ëª' || h === 'eng_name' || h === 'english');
+            const emailIdx = headers.findIndex((h: string) => h === 'ì´ë©ì¼' || h === 'email');
+            const branchIdx = headers.findIndex((h: string) => h === 'ì§ì ' || h === 'branch' || h === 'ì§ì ëª');
+
+            const items = rows.map((row: any[]) => ({
+              name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
+              eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
+              email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
+              branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
+              status: 'active',
+            })).filter((i: any) => i.name || i.eng_name);
+            setParsed(items);
+          } else {
+            const numIdx = headers.findIndex((h: string) => h === 'ë²í¸' || h === 'num' || h === '#');
+            const nameIdx = headers.findIndex((h: string) => h === 'ì§ì ëª' || h === 'name' || h === 'ì´ë¦');
+            const regionIdx = headers.findIndex((h: string) => h === 'ì§ì­' || h === 'region');
+            const toIdx = headers.findIndex((h: string) => h === 'to' || h === 'target');
+
+            const items = rows.map((row: any[]) => ({
+              branch_num: numIdx >= 0 ? Number(row[numIdx]) || 0 : 0,
+              name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
+              region: regionIdx >= 0 ? String(row[regionIdx] || defaultRegion) : defaultRegion,
+              target_to: toIdx >= 0 ? Number(row[toIdx]) || 5 : 5,
+            })).filter((i: any) => i.name);
+            setParsed(items);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      document.head.appendChild(script);
     }
+    e.target.value = '';
   };
 
   const handleUpload = async () => {
@@ -1082,13 +1165,12 @@ function BulkUploadSection() {
     const errors: string[] = [];
 
     if (uploadType === 'employees') {
-      // Batch insert employees
       const payload = parsed.map((p: any) => ({
         name: p.name || '',
         eng_name: p.eng_name,
-        status: 'active' as const,
+        email: p.email || null,
+        status: (p.status || 'active') as 'active',
       }));
-      // Insert in batches of 50
       for (let i = 0; i < payload.length; i += 50) {
         const batch = payload.slice(i, i + 50);
         const { error, data } = await supabase.from('employees').insert(batch).select();
@@ -1096,13 +1178,12 @@ function BulkUploadSection() {
         else { success += (data?.length || 0); }
       }
     } else {
-      // Insert branches one by one to catch duplicates
       for (const p of parsed) {
         const { error } = await supabase.from('branches').insert({
           branch_num: (p as any).branch_num,
           name: (p as any).name,
-          region: '미지정',
-          target_to: 5,
+          region: (p as any).region || defaultRegion,
+          target_to: (p as any).target_to || 5,
           note: '',
         });
         if (error) { fail++; errors.push(`#${(p as any).branch_num} ${(p as any).name}: ${error.message}`); }
@@ -1122,54 +1203,108 @@ function BulkUploadSection() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">일괄 업로드</h2>
-          <p className="text-sm text-gray-500">인원 또는 지점 데이터를 텍스트로 붙여넣어 한번에 등록</p>
+          <h2 className="text-lg font-bold text-gray-900">ì¼ê´ ìë¡ë</h2>
+          <p className="text-sm text-gray-500">ìì/CSV íì¼ ëë íì¤í¼ë¡ ë°ì´í°ë¥¼ íë²ì ë±ë¡</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => { setUploadType('employees'); setParsed([]); setResult(null); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'employees' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
-            <Users className="w-3.5 h-3.5 inline mr-1" />인원
+            <Users className="w-3.5 h-3.5 inline mr-1" />ì¸ì
           </button>
           <button onClick={() => { setUploadType('branches'); setParsed([]); setResult(null); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'branches' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
-            <MapPin className="w-3.5 h-3.5 inline mr-1" />지점
+            <MapPin className="w-3.5 h-3.5 inline mr-1" />ì§ì 
           </button>
         </div>
       </div>
 
-      {/* Input area */}
-      <div className="bg-white rounded-xl border p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {uploadType === 'employees' ? '인원 데이터 붙여넣기' : '지점 데이터 붙여넣기'}
-        </label>
-        <p className="text-xs text-gray-400 mb-2">
-          {uploadType === 'employees'
-            ? '형식: 이름,영문명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (홍길동Gildong김영희Young...)'
-            : '형식: 번호,지점명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (1HQ2서면4명동...)'}
-        </p>
-        <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
-          rows={8} className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-y"
-          placeholder={uploadType === 'employees' ? '우민주MJ\n이세아Claire\n...' : '1HQ\n2서면\n4명동\n...'} />
-        <div className="flex gap-2 mt-3">
-          <button onClick={handleParse} disabled={!textInput.trim()}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-            미리보기 파싱
-          </button>
-          {parsed.length > 0 && (
-            <button onClick={() => { setParsed([]); setResult(null); }}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">초기화</button>
+      {/* Input mode toggle */}
+      <div className="flex gap-2 mb-3">
+        <button onClick={() => setInputMode('file')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${inputMode === 'file' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}>
+          <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1" />íì¼ ìë¡ë
+        </button>
+        <button onClick={() => setInputMode('text')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${inputMode === 'text' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}>
+          <Edit3 className="w-3.5 h-3.5 inline mr-1" />íì¤í¸ ë¶ì¬ë£ê¸°
+        </button>
+      </div>
+
+      {/* File upload area */}
+      {inputMode === 'file' && (
+        <div className="bg-white rounded-xl border p-4 mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {uploadType === 'employees' ? 'ì¸ì íì¼ ìë¡ë' : 'ì§ì  íì¼ ìë¡ë'}
+          </label>
+          <p className="text-xs text-gray-400 mb-3">
+            {uploadType === 'employees'
+              ? 'ìì/CSV íì¼ (ì»¬ë¼: ì´ë¦, ìë¬¸ëª, ì´ë©ì¼, ì§ì , ìí)'
+              : 'ìì/CSV íì¼ (ì»¬ë¼: ë²í¸, ì§ì ëª, ì§ì­, TO)'}
+          </p>
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-emerald-400 transition relative">
+            <FileSpreadsheet className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500 mb-1">xlsx, csv, tsv íì¼ì ì ííì¸ì</p>
+            <p className="text-xs text-gray-400">ì²«ë²ì§¸ íì´ í¤ë(ì»¬ë¼ëª)ì¬ì¼ í©ëë¤</p>
+            <input type="file" accept=".xlsx,.xls,.csv,.tsv"
+              onChange={handleFileUpload}
+              className="absolute inset-0 opacity-0 cursor-pointer" />
+          </div>
+          {uploadType === 'branches' && (
+            <div className="mt-3 flex items-center gap-2">
+              <label className="text-xs text-gray-500">íì¼ì ì§ì­ ì»¬ë¼ì´ ìì ê²½ì° ê¸°ë³¸ ì§ì­:</label>
+              <select value={defaultRegion} onChange={e => setDefaultRegion(e.target.value)}
+                className="text-xs border rounded px-2 py-1">
+                {regions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Text input area */}
+      {inputMode === 'text' && (
+        <div className="bg-white rounded-xl border p-4 mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {uploadType === 'employees' ? 'ì¸ì ë°ì´í° ë¶ì¬ë£ê¸°' : 'ì§ì  ë°ì´í° ë¶ì¬ë£ê¸°'}
+          </label>
+          <p className="text-xs text-gray-400 mb-2">
+            {uploadType === 'employees'
+              ? 'íì: ì´ë¦,ìë¬¸ëª (ì¤ë°ê¿/í­/ì¼í) ëë ì°ìíì¤í¸ (íê¸¸ëGildongê¹ìí¬Young...)'
+              : 'íì: ë²í¸,ì§ì ëª (ì¤ë°ê¿/í­/ì¼í) ëë ì°ìíì¤í¸ (1HQ2ìë©´4ëªë...)'}
+          </p>
+          <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
+            rows={8} className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-y"
+            placeholder={uploadType === 'employees' ? 'ì°ë¯¼ì£¼MJ\nì´ì¸ìClaire\n...' : '1HQ\n2ìë©´\n4ëªë\n...'} />
+          {uploadType === 'branches' && (
+            <div className="mt-2 flex items-center gap-2">
+              <label className="text-xs text-gray-500">ê¸°ë³¸ ì§ì­:</label>
+              <select value={defaultRegion} onChange={e => setDefaultRegion(e.target.value)}
+                className="text-xs border rounded px-2 py-1">
+                {regions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="flex gap-2 mt-3">
+            <button onClick={handleParse} disabled={!textInput.trim()}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              ë¯¸ë¦¬ë³´ê¸° íì±
+            </button>
+            {parsed.length > 0 && (
+              <button onClick={() => { setParsed([]); setResult(null); }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">ì´ê¸°í</button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Preview */}
       {parsed.length > 0 && (
         <div className="bg-white rounded-xl border overflow-hidden mb-4">
           <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">파싱 결과: {parsed.length}건</span>
+            <span className="text-sm font-medium text-gray-700">íì± ê²°ê³¼: {parsed.length}ê±´</span>
             <button onClick={handleUpload} disabled={uploading}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50">
-              <Upload className="w-4 h-4" />{uploading ? '업로드 중...' : `${parsed.length}건 일괄 등록`}
+              <Upload className="w-4 h-4" />{uploading ? 'ìë¡ë ì¤...' : `${parsed.length}ê±´ ì¼ê´ ë±ë¡`}
             </button>
           </div>
           <div className="max-h-80 overflow-y-auto">
@@ -1177,13 +1312,13 @@ function BulkUploadSection() {
               <thead><tr className="bg-gray-50 border-b sticky top-0">
                 {uploadType === 'employees' ? (
                   <><th className="text-left px-4 py-2 font-semibold">#</th>
-                    <th className="text-left px-4 py-2 font-semibold">이름</th>
-                    <th className="text-left px-4 py-2 font-semibold">영문명</th>
-                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
+                    <th className="text-left px-4 py-2 font-semibold">ì´ë¦</th>
+                    <th className="text-left px-4 py-2 font-semibold">ìë¬¸ëª</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">ì­ì </th></>
                 ) : (
-                  <><th className="text-center px-4 py-2 font-semibold w-16">번호</th>
-                    <th className="text-left px-4 py-2 font-semibold">지점명</th>
-                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
+                  <><th className="text-center px-4 py-2 font-semibold w-16">ë²í¸</th>
+                    <th className="text-left px-4 py-2 font-semibold">ì§ì ëª</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">ì­ì </th></>
                 )}
               </tr></thead>
               <tbody>
@@ -1212,8 +1347,8 @@ function BulkUploadSection() {
       {result && (
         <div className={`rounded-xl border p-4 ${result.fail > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
           <div className="flex items-center gap-3 mb-2">
-            <span className="text-sm font-bold text-emerald-700">성공: {result.success}건</span>
-            {result.fail > 0 && <span className="text-sm font-bold text-red-600">실패: {result.fail}건</span>}
+            <span className="text-sm font-bold text-emerald-700">ì±ê³µ: {result.success}ê±´</span>
+            {result.fail > 0 && <span className="text-sm font-bold text-red-600">ì¤í¨: {result.fail}ê±´</span>}
           </div>
           {result.errors.length > 0 && (
             <div className="text-xs text-red-600 space-y-1 mt-2">
@@ -1225,4 +1360,3 @@ function BulkUploadSection() {
     </div>
   );
 }
-
