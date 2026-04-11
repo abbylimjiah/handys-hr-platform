@@ -445,20 +445,20 @@ function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
-    try {
-      if (employee) {
-        await supabase.from('employees').update({
-          eng_name: engName, name, status, status_note: note,
-          branch_id: branch.id, slot_number: slotNum
-        }).eq('id', employee.id);
-      } else {
-        await supabase.from('employees').insert({
-          eng_name: engName, name, status, status_note: note,
-          branch_id: branch.id, slot_number: slotNum
-        });
-      }
-      onSaved();
-    } catch (e) { alert('저장 실패'); }
+    if (employee) {
+      const { error } = await supabase.from('employees').update({
+        eng_name: engName, name, status, status_note: note,
+        branch_id: branch.id, slot_number: slotNum
+      }).eq('id', employee.id);
+      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+    } else {
+      const { error } = await supabase.from('employees').insert({
+        eng_name: engName, name, status, status_note: note,
+        branch_id: branch.id, slot_number: slotNum
+      });
+      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+    }
+    onSaved();
     setSaving(false);
   };
 
@@ -632,15 +632,15 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
-    try {
-      const payload = { ...form, branch_id: form.branch_id || null };
-      if (employee) {
-        await supabase.from('employees').update(payload).eq('id', employee.id);
-      } else {
-        await supabase.from('employees').insert(payload);
-      }
-      onSaved();
-    } catch (e) { alert('저장 실패'); }
+    const payload = { ...form, branch_id: form.branch_id || null };
+    if (employee) {
+      const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
+      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+    } else {
+      const { error } = await supabase.from('employees').insert(payload);
+      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+    }
+    onSaved();
     setSaving(false);
   };
 
