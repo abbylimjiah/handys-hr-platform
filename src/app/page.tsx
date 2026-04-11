@@ -21,6 +21,15 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
+    // 임시: 인증 없이 바로 접근 (테스트용)
+    const DEV_BYPASS = true;
+    if (DEV_BYPASS) {
+      setUser({ email: 'abby.lim@handys.co.kr' });
+      setUserRole({ email: 'abby.lim@handys.co.kr', role: 'admin', name: 'Abby' });
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user?.email) {
