@@ -376,18 +376,10 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                             <div className="font-medium text-gray-900">{br.name}</div>
                             <div className="text-xs text-gray-400">#{br.branch_num}</div>
                           </td>
-                          <td className="text-center px-1 py-1.5">
-                            {br.hm ? (
-                              <button onClick={() => { setModal({ branch: br, slotNum: 0, employee: br.hm }); }}
-                                className="w-full min-h-[40px] px-2 py-1 bg-pink-50 border border-pink-300 rounded-lg text-xs font-medium text-pink-700 transition hover:shadow-md">
-                                {br.hm.eng_name}
-                              </button>
-                            ) : (
-                              <button onClick={() => { setModal({ branch: br, slotNum: 0 }); }}
-                                className="w-full h-10 border border-dashed border-gray-300 rounded-lg text-gray-300 hover:border-pink-400 hover:text-pink-400 hover:bg-pink-50 transition flex items-center justify-center">
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            )}
+                          <td className="text-center px-2 py-2">
+                            <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded">
+                              {br.hm?.eng_name || '-'}
+                            </span>
                           </td>
                           {[1,2,3,4,5,6,7,8,9].map(slotNum => {
                             const emp = br.emps.find(e => e.slot_number === slotNum);
@@ -434,7 +426,6 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       {modal && (
         <SlotModal
           branch={modal.branch} slotNum={modal.slotNum} employee={modal.employee}
-          isHmSlot={modal.slotNum === 0}
           employees={employees} onClose={() => setModal(null)} onSaved={() => { setModal(null); onRefresh(); }}
         />
       )}
@@ -442,9 +433,9 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   );
 }
 
-function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, onSaved }: {
-  branch: Branch; slotNum: number; employee?: Employee; isHmSlot?: boolean;
-  employees: Employee[]; onClose: () => void; onSaved: () => void;
+function SlotModal({ branch, slotNum, employee, employees, onClose, onSaved }: {
+  branch: Branch; slotNum: number; employee?: Employee; employees: Employee[];
+  onClose: () => void; onSaved: () => void;
 }) {
   const [engName, setEngName] = useState(employee?.eng_name || '');
   const [name, setName] = useState(employee?.name || '');
@@ -454,17 +445,17 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
 
   const handleSave = async () => {
     setSaving(true);
-    const payload = {
-      eng_name: engName, name, status, status_note: note,
-      branch_id: branch.id,
-      slot_number: isHmSlot ? null : slotNum,
-      is_hm: isHmSlot || false,
-    };
     if (employee) {
-      const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
+      const { error } = await supabase.from('employees').update({
+        eng_name: engName, name, status, status_note: note,
+        branch_id: branch.id, slot_number: slotNum
+      }).eq('id', employee.id);
       if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
     } else {
-      const { error } = await supabase.from('employees').insert(payload);
+      const { error } = await supabase.from('employees').insert({
+        eng_name: engName, name, status, status_note: note,
+        branch_id: branch.id, slot_number: slotNum
+      });
       if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
     }
     onSaved();
@@ -473,8 +464,8 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
 
   const statusOptions = [
     { key: 'active', label: '재직' }, { key: 'hiring', label: '채용필요' },
-    { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동예정' },
-    { key: 'leave', label: '휴직/육아' },
+    { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동옄정' },
+    { key: 'leave', label: '휴직/육가' },
   ];
 
   return (
@@ -483,7 +474,7 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
         <div className="flex items-center justify-between p-4 border-b">
           <div>
             <h3 className="font-bold text-gray-900">{employee ? '슬롯 편집' : '인원 배치'}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{branch.name}{isHmSlot ? ' - HM' : ` - 슬롯 ${slotNum}`}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{branch.name} - 슬롭 {slotNum}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
         </div>
