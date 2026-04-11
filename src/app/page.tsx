@@ -444,16 +444,6 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
   const [note, setNote] = useState(employee?.status_note || '');
   const [saving, setSaving] = useState(false);
 
-  const handleDelete = async () => {
-    if (!employee) return;
-    if (!confirm(`${employee.eng_name || employee.name} 을(를) 삭제하시겠습니까?`)) return;
-    setSaving(true);
-    const { error } = await supabase.from('employees').delete().eq('id', employee.id);
-    if (error) { alert('삭제 실패: ' + error.message); setSaving(false); return; }
-    onSaved();
-    setSaving(false);
-  };
-
   const handleSave = async () => {
     setSaving(true);
     const payload = {
@@ -515,12 +505,6 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t">
-          {employee && (
-            <button onClick={handleDelete} disabled={saving}
-              className="px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center justify-center gap-1">
-              <Trash2 className="w-4 h-4" />삭제
-            </button>
-          )}
           <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
           <button onClick={handleSave} disabled={saving || !engName}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
