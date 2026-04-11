@@ -376,10 +376,18 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                             <div className="font-medium text-gray-900">{br.name}</div>
                             <div className="text-xs text-gray-400">#{br.branch_num}</div>
                           </td>
-                          <td className="text-center px-2 py-2">
-                            <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded">
-                              {br.hm?.eng_name || '-'}
-                            </span>
+                          <td className="text-center px-1 py-1.5">
+                            {br.hm ? (
+                              <button onClick={() => { setModal({ branch: br, slotNum: 0, employee: br.hm }); }}
+                                className="w-full min-h-[40px] px-2 py-1 bg-pink-50 border border-pink-300 rounded-lg text-xs font-medium text-pink-700 transition hover:shadow-md">
+                                {br.hm.eng_name}
+                              </button>
+                            ) : (
+                              <button onClick={() => { setModal({ branch: br, slotNum: 0 }); }}
+                                className="w-full h-10 border border-dashed border-gray-300 rounded-lg text-gray-300 hover:border-pink-400 hover:text-pink-400 hover:bg-pink-50 transition flex items-center justify-center">
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            )}
                           </td>
                           {[1,2,3,4,5,6,7,8,9].map(slotNum => {
                             const emp = br.emps.find(e => e.slot_number === slotNum);
@@ -426,7 +434,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       {modal && (
         <SlotModal
           branch={modal.branch} slotNum={modal.slotNum} employee={modal.employee}
-          isHmSlot={modal.branch.region === 'HQ' && modal.slotNum === 0}
+          isHmSlot={modal.slotNum === 0}
           employees={employees} onClose={() => setModal(null)} onSaved={() => { setModal(null); onRefresh(); }}
         />
       )}
