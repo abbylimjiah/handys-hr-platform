@@ -448,7 +448,8 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
     setSaving(true);
     const payload = {
       eng_name: engName, name, status, status_note: note,
-      branch_id: branch.id, slot_number: slotNum,
+      branch_id: branch.id,
+      slot_number: isHmSlot ? null : slotNum,
       is_hm: isHmSlot || false,
     };
     if (employee) {
@@ -464,8 +465,8 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
 
   const statusOptions = [
     { key: 'active', label: '재직' }, { key: 'hiring', label: '채용필요' },
-    { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동옄정' },
-    { key: 'leave', label: '휴직/육가' },
+    { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동예정' },
+    { key: 'leave', label: '휴직/육아' },
   ];
 
   return (
