@@ -303,6 +303,58 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
               {Object.entries(boardData).map(([rgn, items]) => {
                 const rTO = items.reduce((s, b) => s + b.target_to, 0);
                 const rFill = items.reduce((s, b) => s + b.emps.length, 0);
+
+                /* ── HQ: 리드 슬롯 카드형 렌더링 ── */
+                if (rgn === 'HQ') {
+                  const hqBranch = items[0];
+                  if (!hqBranch) return null;
+                  const slotLabels = [
+                    { label: 'HM리드', slotNum: 0, isHm: true },
+                    { label: 'M1리드', slotNum: 1, isHm: false },
+                    { label: 'M2리드', slotNum: 2, isHm: false },
+                    { label: 'M3리드', slotNum: 3, isHm: false },
+                    { label: 'M4리드', slotNum: 4, isHm: false },
+                  ];
+                  return (
+                    <React.Fragment key={rgn}>
+                      <tr className="bg-indigo-50 border-b">
+                        <td colSpan={14} className="px-3 py-2">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="font-bold text-indigo-800">HQ</span>
+                            <span className="text-xs text-indigo-600 bg-indigo-200 px-2 py-0.5 rounded-full">본부 리드</span>
+                            <span className="text-xs text-gray-500 ml-2">TO {hqBranch.target_to} / 현원 {hqBranch.emps.length}</span>
+                          </div>
+                          <div className="flex gap-4 pb-2">
+                            {slotLabels.map(slot => {
+                              const emp = slot.isHm
+                                ? hqBranch.emps.find(e => e.is_hm)
+                                : hqBranch.emps.find(e => e.slot_number === slot.slotNum && !e.is_hm);
+                              return (
+                                <div key={slot.label} className="flex flex-col items-center gap-1.5 min-w-[120px]">
+                                  <div className="text-xs font-semibold text-indigo-700">{slot.label}</div>
+                                  {emp ? (
+                                    <button onClick={() => handleSlotClick(hqBranch, slot.slotNum)}
+                                      className="w-full px-3 py-2 bg-pink-50 border border-pink-300 rounded-xl text-center hover:shadow-md transition">
+                                      <div className="text-sm font-bold text-pink-700">{emp.eng_name}</div>
+                                      {emp.status_note && <div className="text-[10px] text-gray-500">{emp.status_note}</div>}
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => handleSlotClick(hqBranch, slot.slotNum)}
+                                      className="w-full px-3 py-4 border-2 border-dashed border-indigo-300 rounded-xl text-indigo-300 hover:border-indigo-500 hover:text-indigo-500 hover:bg-indigo-50 transition flex items-center justify-center">
+                                      <Plus className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                }
+
+                /* ── 일반 지역: 기존 테이블 행 렌더링 ── */
                 return (
                   <React.Fragment key={rgn}>
                     <tr className="bg-emerald-50 border-b cursor-pointer hover:bg-emerald-100 transition"
