@@ -204,7 +204,7 @@ export default function Home() {
         {tab === 'board' && <BoardView branches={branches} employees={employees} search={search} canEdit={canEdit} onRefresh={loadData} />}
         {tab === 'roster' && <RosterView branches={branches} employees={employees} search={search} canEdit={canEdit} onRefresh={loadData} />}
         {tab === 'summary' && <SummaryView branches={branches} employees={employees} />}
-        {tab === 'settings' && isAdmin && <SettingsView />}
+        {tab === 'settings' && isAdmin && <SettingsView branches={branches} />}
       </main>
     </div>
   );
@@ -1173,7 +1173,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
 }
 
 // ─── Settings View (Admin only) ───
-function SettingsView() {
+function SettingsView({ branches }: { branches: Branch[] }) {
   const [settingsTab, setSettingsTab] = useState<'users' | 'branches' | 'upload'>('users');
   const settingsTabs = [
     { id: 'users' as const, label: '사용자 권한', icon: Shield },
@@ -1195,7 +1195,7 @@ function SettingsView() {
       </div>
       {settingsTab === 'users' && <UserRolesSection />}
       {settingsTab === 'branches' && <BranchManageSection />}
-      {settingsTab === 'upload' && <BulkUploadSection />}
+      {settingsTab === 'upload' && <BulkUploadSection branches={branches} />}
     </div>
   );
 }
@@ -1437,7 +1437,7 @@ function BranchManageSection() {
 }
 
 // ─── Bulk Upload Section ───
-function BulkUploadSection() {
+function BulkUploadSection({ branches }: { branches: Branch[] }) {
   const [uploadType, setUploadType] = useState<'employees' | 'branches'>('employees');
   const [inputMode, setInputMode] = useState<'text' | 'file'>('file');
   const [textInput, setTextInput] = useState('');
@@ -1559,13 +1559,22 @@ function BulkUploadSection() {
             const engIdx = headers.findIndex((h: string) => h === '영문명' || h === 'eng_name' || h === 'english');
             const emailIdx = headers.findIndex((h: string) => h === '이메일' || h === 'email');
             const branchIdx = headers.findIndex((h: string) => h === '지점' || h === 'branch' || h === '지점명');
+            const statusIdx = headers.findIndex((h: string) => h === '상태' || h === 'status');
+            const hireDateIdx = headers.findIndex((h: string) => h === '입사일자' || h === '입사일' || h === 'hire_date');
+            const resignDateIdx = headers.findIndex((h: string) => h === '퇴사일자' || h === '퇴사일' || h === 'resign_date');
+            const titleIdx = headers.findIndex((h: string) => h === '직책명' || h === '직책' || h === 'title' || h === 'role');
+
+            const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
 
             const items = rows.map((row: any[]) => ({
               name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
               eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
               email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
               branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
-              status: 'active',
+              status: statusIdx >= 0 ? (statusMap[String(row[statusIdx] || '').trim()] || 'active') : 'active',
+              hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
+              resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
+              is_hm: titleIdx >= 0 ? String(row[titleIdx] || '').trim() === 'HM' : false,
             })).filter((i: any) => i.name || i.eng_name);
             setParsed(items);
           } else {
@@ -1597,17 +1606,45 @@ function BulkUploadSection() {
     const errors: string[] = [];
 
     if (uploadType === 'employees') {
-      const payload = parsed.map((p: any) => ({
-        name: p.name || '',
-        eng_name: p.eng_name,
-        email: p.email || null,
-        status: (p.status || 'active') as 'active',
-      }));
-      for (let i = 0; i < payload.length; i += 50) {
-        const batch = payload.slice(i, i + 50);
-        const { error, data } = await supabase.from('employees').insert(batch).select();
-        if (error) { fail += batch.length; errors.push(`Row ${i+1}~${i+batch.length}: ${error.message}`); }
-        else { success += (data?.length || 0); }
+      // 지점 매칭 맵 생성
+      const branchMap: Record<string, number> = {};
+      branches.forEach(b => {
+        branchMap[b.name] = b.id;
+        branchMap[b.name.replace(/\s/g, '')] = b.id;
+      });
+
+      for (const p of parsed as any[]) {
+        const branchId = p.branch_name ? (branchMap[p.branch_name] || branchMap[p.branch_name.replace(/\s/g, '')] || null) : null;
+        const row: any = {
+          name: p.name || '',
+          eng_name: p.eng_name || '',
+          email: p.email || null,
+          status: p.status || 'active',
+          branch_id: branchId,
+          is_hm: p.is_hm || false,
+        };
+        if (p.hire_date) row.hire_date = p.hire_date;
+        if (p.resign_date) row.resign_date = p.resign_date;
+
+        // 이메일이 있으면 upsert (이메일 기준), 없으면 영문명+이름으로 찾아서 update, 아니면 insert
+        if (row.email) {
+          const { error } = await supabase.from('employees').upsert(row, { onConflict: 'email' });
+          if (error) { fail++; errors.push(`${p.eng_name || p.name}: ${error.message}`); }
+          else { success++; }
+        } else {
+          // 이메일 없는 경우: 영문명으로 기존 직원 찾기
+          const { data: existing } = await supabase.from('employees')
+            .select('id').eq('eng_name', row.eng_name).eq('name', row.name).limit(1);
+          if (existing && existing.length > 0) {
+            const { error } = await supabase.from('employees').update(row).eq('id', existing[0].id);
+            if (error) { fail++; errors.push(`${p.eng_name || p.name}: ${error.message}`); }
+            else { success++; }
+          } else {
+            const { error } = await supabase.from('employees').insert(row);
+            if (error) { fail++; errors.push(`${p.eng_name || p.name}: ${error.message}`); }
+            else { success++; }
+          }
+        }
       }
     } else {
       for (const p of parsed) {
