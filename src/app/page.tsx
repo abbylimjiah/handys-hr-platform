@@ -510,7 +510,18 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                     {multiSelect && <div className="text-[10px] mb-0.5">{selected.has(emp.id) ? '☑' : '☐'}</div>}
                                     <div className="font-bold text-[13px]">{emp.eng_name}</div>
                                     <div className="text-[10px] text-gray-500 mt-0.5">{emp.name}</div>
-                                    {emp.status_note && <div className="text-[9px] text-gray-400 mt-0.5">{emp.status_note}</div>}
+                                    {(() => {
+                                      const label =
+                                        emp.status === 'leave' ? '휴직중' :
+                                        emp.status === 'resigning' && emp.resign_date ? `퇴사 ${emp.resign_date.slice(5)}` :
+                                        emp.status === 'resigning' ? '퇴사예정' :
+                                        emp.status === 'onboarding' && emp.hire_date ? `입사 ${emp.hire_date.slice(5)}` :
+                                        emp.status === 'onboarding' ? '입사대기' :
+                                        emp.status === 'transfer' ? '이동예정' :
+                                        emp.status === 'hiring' ? '' :
+                                        emp.hire_date ? `${emp.hire_date.slice(2,7)}입사` : '';
+                                      return label ? <div className="text-[9px] text-gray-400 mt-0.5">{label}</div> : null;
+                                    })()}
                                   </button>
                                 ) : (
                                   <button onClick={() => handleSlotClick(br, slotNum)}
