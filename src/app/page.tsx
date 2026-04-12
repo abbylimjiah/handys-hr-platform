@@ -840,7 +840,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
             <label className="block text-sm font-medium text-gray-700 mb-1">소속 지점</label>
             <select value={form.branch_id} onChange={e => setForm(p => ({ ...p, branch_id: e.target.value ? Number(e.target.value) : '' as any }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-              <option value="">민배정</option>
+              <option value="">미배정</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
