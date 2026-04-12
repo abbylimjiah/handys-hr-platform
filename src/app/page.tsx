@@ -722,9 +722,12 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
     setTransferUploading(true);
     let updated = 0, notFound: string[] = [], branchNotFound: string[] = [];
 
+    // 1단계: 매칭 + 지점별 그룹핑
+    type MatchedItem = { emp: Employee; branch: Branch | null; item: any; isHm: boolean; isLead: boolean };
+    const matched: MatchedItem[] = [];
+
     for (const item of transferPreview) {
-      if (!item.eng_name) continue; // 빈 슬롯 스킵
-      // 지점 매칭 (부분 매칭)
+      if (!item.eng_name) continue;
       const branch = branches.find(b =>
         b.name === item.branch_name ||
         b.name.replace(/\s/g, '') === item.branch_name.replace(/\s/g, '') ||
@@ -735,26 +738,47 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
         if (!branchNotFound.includes(item.branch_name)) branchNotFound.push(item.branch_name);
         continue;
       }
-      // 직원 매칭 (영문명)
-      const emp = employees.find(e =>
-        e.eng_name.toLowerCase() === item.eng_name.toLowerCase()
-      );
-      if (!emp) {
-        notFound.push(item.eng_name);
-        continue;
-      }
-      // 업데이트
-      const payload: any = {
-        branch_id: branch ? branch.id : null,
-        is_hm: item.role === 'HM',
-      };
-      if (item.hire_date) payload.hire_date = item.hire_date;
+      const emp = employees.find(e => e.eng_name.toLowerCase() === item.eng_name.toLowerCase());
+      if (!emp) { notFound.push(item.eng_name); continue; }
 
-      const { error } = await supabase.from('employees').update(payload).eq('id', emp.id);
+      const isLead = item.role === 'Lead' || item.role === '리드';
+      const isHm = item.role === 'HM' || isLead;
+      matched.push({ emp, branch: branch || null, item, isHm, isLead });
+    }
+
+    // 2단계: 지점별 매니저를 입사일 빠른 순 정렬 → 슬롯 배정
+    const branchSlots: Record<number, MatchedItem[]> = {};
+    matched.forEach(m => {
+      if (m.branch && !m.isHm) {
+        if (!branchSlots[m.branch.id]) branchSlots[m.branch.id] = [];
+        branchSlots[m.branch.id].push(m);
+      }
+    });
+    const slotMap = new Map<number, number>(); // emp.id → slot_number
+    Object.values(branchSlots).forEach(group => {
+      group.sort((a, b) => {
+        const da = a.item.hire_date || a.emp.hire_date || '9999';
+        const db = b.item.hire_date || b.emp.hire_date || '9999';
+        return da.localeCompare(db);
+      });
+      group.forEach((m, idx) => slotMap.set(m.emp.id, idx + 1));
+    });
+
+    // 3단계: DB 업데이트
+    for (const m of matched) {
+      const payload: any = {
+        branch_id: m.branch ? m.branch.id : null,
+        is_hm: m.isHm,
+        slot_number: m.isHm ? null : (slotMap.get(m.emp.id) || null),
+        status_note: m.isLead ? 'Lead' : '',
+      };
+      if (m.item.hire_date) payload.hire_date = m.item.hire_date;
+
+      const { error } = await supabase.from('employees').update(payload).eq('id', m.emp.id);
       if (!error) updated++;
     }
 
-    let msg = `✅ ${updated}명 이동 완료!`;
+    let msg = `✅ ${updated}명 이동 완료! (슬롯 입사일순 자동배정)`;
     if (notFound.length > 0) msg += `\n\n⚠️ 매칭 안된 이름 (${notFound.length}명):\n${notFound.join(', ')}`;
     if (branchNotFound.length > 0) msg += `\n\n⚠️ 매칭 안된 지점:\n${branchNotFound.join(', ')}`;
     alert(msg);
@@ -834,6 +858,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
                       emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-emerald-100 text-emerald-700'
                     }`}>
                       {emp.eng_name.charAt(0)}
@@ -844,8 +869,9 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3 text-gray-600">{emp.eng_name}</td>
                 <td className="text-center px-3 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
                     emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
-                  }`}>{emp.is_hm ? 'HM' : '매니저'}</span>
+                  }`}>{emp.status_note === 'Lead' ? 'Lead' : emp.is_hm ? 'HM' : '매니저'}</span>
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{(emp.branch as any)?.name || '미배정'}</span>
@@ -1566,16 +1592,20 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
 
             const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
 
-            const items = rows.map((row: any[]) => ({
-              name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
-              eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
-              email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
-              branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
-              status: statusIdx >= 0 ? (statusMap[String(row[statusIdx] || '').trim()] || 'active') : 'active',
-              hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
-              resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
-              is_hm: titleIdx >= 0 ? String(row[titleIdx] || '').trim() === 'HM' : false,
-            })).filter((i: any) => i.name || i.eng_name);
+            const items = rows.map((row: any[]) => {
+              const title = titleIdx >= 0 ? String(row[titleIdx] || '').trim() : '';
+              return {
+                name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
+                eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
+                email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
+                branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
+                status: statusIdx >= 0 ? (statusMap[String(row[statusIdx] || '').trim()] || 'active') : 'active',
+                hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
+                resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
+                is_hm: title === 'HM' || title === 'Lead' || title === '리드',
+                status_note: (title === 'Lead' || title === '리드') ? 'Lead' : '',
+              };
+            }).filter((i: any) => i.name || i.eng_name);
             setParsed(items);
           } else {
             const numIdx = headers.findIndex((h: string) => h === '번호' || h === 'num' || h === '#');
@@ -1613,15 +1643,43 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
         branchMap[b.name.replace(/\s/g, '')] = b.id;
       });
 
-      for (const p of parsed as any[]) {
+      // 입사일 기준 정렬 후 지점별 슬롯 자동 배정
+      const enriched = (parsed as any[]).map(p => {
         const branchId = p.branch_name ? (branchMap[p.branch_name] || branchMap[p.branch_name.replace(/\s/g, '')] || null) : null;
+        return { ...p, branchId };
+      });
+
+      // 지점별로 그룹핑 → 입사일 빠른 순 정렬 → 슬롯 번호 배정
+      const branchGroups: Record<number, any[]> = {};
+      enriched.forEach(p => {
+        if (p.branchId && !(p.is_hm)) {
+          if (!branchGroups[p.branchId]) branchGroups[p.branchId] = [];
+          branchGroups[p.branchId].push(p);
+        }
+      });
+      // 입사일 빠른 순 정렬
+      Object.values(branchGroups).forEach(group => {
+        group.sort((a: any, b: any) => {
+          const da = a.hire_date || '9999';
+          const db = b.hire_date || '9999';
+          return da.localeCompare(db);
+        });
+        group.forEach((p: any, idx: number) => { p._slotNumber = idx + 1; });
+      });
+
+      for (const p of enriched) {
+        const isHm = p.is_hm || false;
+        const isLead = p.status_note === 'Lead';
+
         const row: any = {
           name: p.name || '',
           eng_name: p.eng_name || '',
           email: p.email || null,
           status: p.status || 'active',
-          branch_id: branchId,
-          is_hm: p.is_hm || false,
+          branch_id: p.branchId,
+          is_hm: isHm,
+          slot_number: isHm ? null : (p._slotNumber || null),
+          status_note: isLead ? 'Lead' : (p.status_note || ''),
         };
         if (p.hire_date) row.hire_date = p.hire_date;
         if (p.resign_date) row.resign_date = p.resign_date;
@@ -1632,7 +1690,6 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
           if (error) { fail++; errors.push(`${p.eng_name || p.name}: ${error.message}`); }
           else { success++; }
         } else {
-          // 이메일 없는 경우: 영문명으로 기존 직원 찾기
           const { data: existing } = await supabase.from('employees')
             .select('id').eq('eng_name', row.eng_name).eq('name', row.name).limit(1);
           if (existing && existing.length > 0) {
