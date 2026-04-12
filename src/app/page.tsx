@@ -623,6 +623,9 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
   branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => void;
 }) {
   const [modal, setModal] = useState<Employee | 'new' | null>(null);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const filtered = useMemo(() => {
     const active = employees.filter(e => e.status !== 'resigned');
@@ -636,8 +639,37 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
   }, [employees, search]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('퇴사 처리하시겠습니까?')) return;
-    await supabase.from('employees').update({ status: 'resigned', resign_date: new Date().toISOString().split('T')[0] }).eq('id', id);
+    if (!confirm('완전 삭제하시겠습니까? (복구 불가)')) return;
+    await supabase.from('employees').delete().eq('id', id);
+    onRefresh();
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(e => e.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`선택한 ${selected.size}명을 완전 삭제하시겠습니까? (복구 불가)`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selected);
+    const { error } = await supabase.from('employees').delete().in('id', ids);
+    if (error) { alert('삭제 실패: ' + error.message); }
+    setBulkDeleting(false);
+    setSelected(new Set());
+    setMultiSelect(false);
     onRefresh();
   };
 
@@ -648,29 +680,54 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
           <h2 className="text-lg font-bold text-gray-900">운영파트 인원리스트</h2>
           <p className="text-sm text-gray-500">총 {filtered.length}명 (퇴사 제외)</p>
         </div>
-        {canEdit && (
-          <button onClick={() => setModal('new')}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
-            <Plus className="w-4 h-4" />신규 등록
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <button onClick={() => { setMultiSelect(!multiSelect); setSelected(new Set()); }}
+              className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition ${
+                multiSelect ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'
+              }`}>
+              {multiSelect ? '선택 취소' : '다중 선택'}
+            </button>
+          )}
+          {canEdit && (
+            <button onClick={() => setModal('new')}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
+              <Plus className="w-4 h-4" />신규 등록
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
+              {multiSelect && (
+                <th className="text-center px-3 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleAll} className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                </th>
+              )}
               <th className="text-left px-4 py-3 font-semibold">이름</th>
               <th className="text-left px-4 py-3 font-semibold">영문명</th>
               <th className="text-left px-4 py-3 font-semibold">이메일</th>
               <th className="text-left px-4 py-3 font-semibold">소속</th>
               <th className="text-center px-4 py-3 font-semibold">상태</th>
-              {canEdit && <th className="text-center px-4 py-3 font-semibold w-24">관리</th>}
+              {canEdit && !multiSelect && <th className="text-center px-4 py-3 font-semibold w-24">관리</th>}
             </tr>
           </thead>
           <tbody>
             {filtered.map(emp => (
-              <tr key={emp.id} className="border-b hover:bg-gray-50 transition">
+              <tr key={emp.id} className={`border-b transition ${
+                multiSelect && selected.has(emp.id) ? 'bg-red-50' : 'hover:bg-gray-50'
+              }`} onClick={multiSelect ? () => toggleSelect(emp.id) : undefined}
+                style={multiSelect ? { cursor: 'pointer' } : undefined}>
+                {multiSelect && (
+                  <td className="text-center px-3 py-3">
+                    <input type="checkbox" checked={selected.has(emp.id)}
+                      onChange={() => toggleSelect(emp.id)} className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-xs font-bold text-emerald-700">
@@ -694,7 +751,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                     'bg-gray-100 text-gray-600'
                   }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status}</span>
                 </td>
-                {canEdit && (
+                {canEdit && !multiSelect && (
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => setModal(emp)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><Edit3 className="w-4 h-4" /></button>
@@ -707,6 +764,19 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
           </tbody>
         </table>
       </div>
+
+      {/* Multi-select floating bar */}
+      {multiSelect && selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-40">
+          <span className="text-sm font-medium">{selected.size}명 선택</span>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+            <Trash2 className="w-4 h-4" />{bulkDeleting ? '삭제 중...' : '일괄 삭제'}
+          </button>
+          <button onClick={() => { setSelected(new Set()); setMultiSelect(false); }}
+            className="px-3 py-2 text-sm text-gray-300 hover:text-white">취소</button>
+        </div>
+      )}
 
       {modal && (
         <EmpModal
