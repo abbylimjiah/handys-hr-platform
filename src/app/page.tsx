@@ -242,13 +242,15 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       if (!groups[b.region]) groups[b.region] = [];
       const emps = employees.filter(e => e.branch_id === b.id && e.status !== 'resigned');
       const hm = emps.find(e => e.is_hm);
-      // 매니저만 입사일순 정렬 → 슬롯 재배정 (HM 제외)
-      const mgrs = emps.filter(e => !e.is_hm).sort((a, b) => {
-        const da = a.hire_date || '9999';
-        const db = b.hire_date || '9999';
-        return da.localeCompare(db);
-      });
-      mgrs.forEach((e, idx) => { (e as any).slot_number = idx + 1; });
+      // 일반 매니저만 입사일순 정렬 → 슬롯 재배정 (HM, 리드, 파트장 제외)
+      if (b.region !== 'HQ') {
+        const mgrs = emps.filter(e => !e.is_hm && e.status_note !== 'Lead' && e.status_note !== '파트장').sort((a, b) => {
+          const da = a.hire_date || '9999';
+          const db = b.hire_date || '9999';
+          return da.localeCompare(db);
+        });
+        mgrs.forEach((e, idx) => { (e as any).slot_number = idx + 1; });
+      }
       groups[b.region].push({ ...b, emps, hm });
     });
     // Sort: HQ first, then alphabetical by regionOrder
