@@ -9,20 +9,26 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// ─── 사원코드 헬퍼: status_note에 "역할|사원코드" 형태로 저장 ───
-function parseNote(note: string): { role: string; code: string } {
-  if (!note) return { role: '', code: '' };
+// ─── 사원코드 헬퍼: status_note에 "역할|사원코드|메모" 형태로 저장 ───
+function parseNote(note: string): { role: string; code: string; memo: string } {
+  if (!note) return { role: '', code: '', memo: '' };
   const parts = note.split('|');
-  if (parts.length >= 2) return { role: parts[0], code: parts[1] };
-  // 숫자만 있으면 사원코드
-  if (/^\d+$/.test(note)) return { role: '', code: note };
-  return { role: note, code: '' };
+  if (parts.length >= 3) return { role: parts[0], code: parts[1], memo: parts.slice(2).join('|') };
+  if (parts.length === 2) {
+    // 첫번째가 역할이면 role|code, 아니면 code|memo
+    if (['Lead', '파트장'].includes(parts[0])) return { role: parts[0], code: parts[1], memo: '' };
+    if (/^\d+$/.test(parts[0])) return { role: '', code: parts[0], memo: parts[1] };
+    return { role: parts[0], code: '', memo: parts[1] };
+  }
+  if (/^\d+$/.test(note)) return { role: '', code: note, memo: '' };
+  if (['Lead', '파트장'].includes(note)) return { role: note, code: '', memo: '' };
+  return { role: '', code: '', memo: note };
 }
-function buildNote(role: string, code: string): string {
-  if (role && code) return `${role}|${code}`;
-  if (role) return role;
-  if (code) return code;
-  return '';
+function buildNote(role: string, code: string, memo?: string): string {
+  const parts = [role, code, memo || ''].map(s => s || '');
+  // 뒤에서부터 빈 값 제거
+  while (parts.length > 0 && !parts[parts.length - 1]) parts.pop();
+  return parts.join('|');
 }
 function getRole(emp: { status_note: string; is_hm: boolean }): string {
   const { role } = parseNote(emp.status_note);
@@ -33,6 +39,9 @@ function getRole(emp: { status_note: string; is_hm: boolean }): string {
 }
 function getCode(emp: { status_note: string }): string {
   return parseNote(emp.status_note).code;
+}
+function getMemo(emp: { status_note: string }): string {
+  return parseNote(emp.status_note).memo;
 }
 function isLeadRole(note: string): boolean {
   const { role } = parseNote(note);
@@ -297,7 +306,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   const stats = useMemo(() => {
     const totalTO = branches.reduce((s, b) => s + b.target_to, 0);
     const activeEmps = employees.filter(e => e.status !== 'resigned');
-    const filled = activeEmps.length;
+    const filled = activeEmps.filter(e => e.status !== 'hiring').length;
     const hiring = activeEmps.filter(e => e.status === 'hiring').length;
     return { totalTO, filled, hiring, vacancy: totalTO - filled };
   }, [branches, employees]);
@@ -397,7 +406,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
             <tbody>
               {Object.entries(boardData).map(([rgn, items]) => {
                 const rTO = items.reduce((s, b) => s + b.target_to, 0);
-                const rFill = items.reduce((s, b) => s + b.emps.length, 0);
+                const rFill = items.reduce((s, b) => s + b.emps.filter(e => e.status !== 'hiring').length, 0);
 
                 /* ── HQ: 리드 슬롯 카드형 렌더링 ── */
                 if (rgn === 'HQ') {
@@ -417,7 +426,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                           <div className="flex items-center gap-2 mb-3">
                             <span className="font-bold text-indigo-800">HQ</span>
                             <span className="text-xs text-indigo-600 bg-indigo-200 px-2 py-0.5 rounded-full">본부 리드</span>
-                            <span className="text-xs text-gray-500 ml-2">TO {hqBranch.target_to} / 현원 {hqBranch.emps.length}</span>
+                            <span className="text-xs text-gray-500 ml-2">TO {hqBranch.target_to} / 현원 {hqBranch.emps.filter(e => e.status !== 'hiring').length}</span>
                           </div>
                           <div className="flex gap-4 pb-2">
                             {slotLabels.map(slot => {
@@ -464,7 +473,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                       </td>
                     </tr>
                     {!collapsed[rgn] && items.map(br => {
-                      const fill = br.emps.length;
+                      const fill = br.emps.filter(e => e.status !== 'hiring').length;
                       return (
                         <tr key={br.id} className="border-b hover:bg-gray-50 transition">
                           <td className="px-3 py-2 sticky left-0 bg-white">
@@ -510,16 +519,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                     {multiSelect && <div className="text-[10px] mb-0.5">{selected.has(emp.id) ? '☑' : '☐'}</div>}
                                     <div className="font-bold text-[13px]">{emp.eng_name}</div>
                                     <div className="text-[10px] text-gray-500 mt-0.5">{emp.name}</div>
-                                    {(() => {
-                                      const label =
-                                        emp.status === 'leave' ? '육아휴직중' :
-                                        emp.status === 'resigning' && emp.resign_date ? `퇴사예정 ${emp.resign_date.slice(5)}` :
-                                        emp.status === 'resigning' ? '퇴사예정' :
-                                        emp.status === 'onboarding' ? '입사대기' :
-                                        emp.status === 'transfer' ? '이동예정' :
-                                        '';
-                                      return label ? <div className="text-[9px] text-gray-400 mt-0.5">{label}</div> : null;
-                                    })()}
+                                    {getMemo(emp) && <div className="text-[9px] text-gray-400 mt-0.5">{getMemo(emp)}</div>}
                                   </button>
                                 ) : (
                                   <button onClick={() => handleSlotClick(br, slotNum)}
@@ -578,7 +578,7 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
   const [engName, setEngName] = useState(employee?.eng_name || '');
   const [name, setName] = useState(employee?.name || '');
   const [status, setStatus] = useState(employee?.status || 'active');
-  const [note, setNote] = useState(employee?.status_note || '');
+  const [note, setNote] = useState(employee ? getMemo(employee) : '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -586,7 +586,11 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
     const payload = {
       eng_name: engName || (status === 'hiring' ? '채용필요' : ''),
       name: name || (status === 'hiring' ? '채용필요' : ''),
-      status, status_note: note,
+      status, status_note: buildNote(
+        employee ? parseNote(employee.status_note).role : '',
+        employee ? parseNote(employee.status_note).code : '',
+        note
+      ),
       branch_id: branch.id,
       slot_number: isHmSlot ? null : slotNum,
       is_hm: isHmSlot || false,
@@ -1109,7 +1113,8 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
     const isHm = form.role === 'HM' || form.role === '파트장';
     const isLead = form.role === 'Lead';
     const roleStr = form.role === '파트장' ? '파트장' : form.role === 'Lead' ? 'Lead' : '';
-    const statusNote = buildNote(roleStr, form.employee_code);
+    const existingMemo = employee ? getMemo(employee) : '';
+    const statusNote = buildNote(roleStr, form.employee_code, existingMemo);
 
     // 슬롯 자동배정: HM/파트장은 null, 매니저/리드는 빈 슬롯 찾아서 배정
     let slotNumber: number | null = null;
@@ -1243,7 +1248,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
       if (!e.branch_id) return;
       const br = branches.find(b => b.id === e.branch_id);
       if (!br || !stats[br.region]) return;
-      stats[br.region].filled++;
+      if (e.status !== 'hiring') stats[br.region].filled++;
       if (e.status === 'hiring') stats[br.region].hiring++;
       if (e.status === 'onboarding') stats[br.region].onboarding++;
       if (e.status === 'transfer') stats[br.region].transfer++;

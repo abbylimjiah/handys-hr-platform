@@ -190,7 +190,7 @@ export async function getSummaryStats() {
     if (!branch) return;
     const r = regions[branch.region];
     if (!r) return;
-    if (e.status !== 'resigned') r.filled++;
+    if (e.status !== 'resigned' && e.status !== 'hiring') r.filled++;
     if (e.status === 'hiring') r.hiring++;
     if (e.status === 'onboarding') r.onboarding++;
     if (e.status === 'transfer') r.transfer++;
