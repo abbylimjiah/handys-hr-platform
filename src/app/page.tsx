@@ -5,9 +5,43 @@ import { supabase, signInWithMagicLink, signOut, getUserRole } from '@/lib/supab
 import type { Branch, Employee, UserRole } from '@/lib/supabase';
 import {
   Search, Plus, Edit3, Trash2, Users, BarChart3, LayoutGrid, Settings,
-  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin, FileSpreadsheet, RefreshCw
+  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin, FileSpreadsheet, RefreshCw, Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+
+// ─── 사원코드 헬퍼: status_note에 "역할|사원코드" 형태로 저장 ───
+function parseNote(note: string): { role: string; code: string } {
+  if (!note) return { role: '', code: '' };
+  const parts = note.split('|');
+  if (parts.length >= 2) return { role: parts[0], code: parts[1] };
+  // 숫자만 있으면 사원코드
+  if (/^\d+$/.test(note)) return { role: '', code: note };
+  return { role: note, code: '' };
+}
+function buildNote(role: string, code: string): string {
+  if (role && code) return `${role}|${code}`;
+  if (role) return role;
+  if (code) return code;
+  return '';
+}
+function getRole(emp: { status_note: string; is_hm: boolean }): string {
+  const { role } = parseNote(emp.status_note);
+  if (role === '파트장') return '파트장';
+  if (role === 'Lead') return 'Lead';
+  if (emp.is_hm) return 'HM';
+  return '매니저';
+}
+function getCode(emp: { status_note: string }): string {
+  return parseNote(emp.status_note).code;
+}
+function isLeadRole(note: string): boolean {
+  const { role } = parseNote(note);
+  return role === 'Lead';
+}
+function isPartjangRole(note: string): boolean {
+  const { role } = parseNote(note);
+  return role === '파트장';
+}
 
 // ─── Main Page ───
 export default function Home() {
@@ -244,7 +278,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       const hm = emps.find(e => e.is_hm);
       // 일반 매니저만 입사일순 정렬 → 슬롯 재배정 (HM, 리드, 파트장 제외)
       if (b.region !== 'HQ') {
-        const mgrs = emps.filter(e => !e.is_hm && e.status_note !== 'Lead' && e.status_note !== '파트장').sort((a, b) => {
+        const mgrs = emps.filter(e => !e.is_hm && !isLeadRole(e.status_note) && !isPartjangRole(e.status_note)).sort((a, b) => {
           const da = a.hire_date || '9999';
           const db = b.hire_date || '9999';
           return da.localeCompare(db);
@@ -317,7 +351,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
         {[
           { l: '총 TO', v: stats.totalTO, c: 'text-gray-900' },
           { l: '현 인원', v: stats.filled, c: 'text-emerald-600' },
-          { l: '채욨 필요', v: stats.hiring, c: 'text-red-600' },
+          { l: '채용필요', v: stats.hiring, c: 'text-red-600' },
           { l: '공석', v: stats.vacancy, c: 'text-amber-600' },
         ].map(s => (
           <div key={s.l} className="bg-white rounded-xl border p-3">
@@ -470,7 +504,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                       emp.status === 'transfer' ? 'bg-purple-50 border-purple-400 text-purple-800' :
                                       emp.status === 'leave' ? 'bg-green-50 border-green-400 text-green-800' :
                                       emp.status === 'resigning' ? 'bg-orange-50 border-orange-400 text-orange-800' :
-                                      emp.status_note === 'Lead' ? 'bg-amber-50 border-amber-300 text-amber-800' :
+                                      isLeadRole(emp.status_note) ? 'bg-amber-50 border-amber-300 text-amber-800' :
                                       'bg-emerald-50 border-emerald-200 text-gray-800'
                                     }`}>
                                     {multiSelect && <div className="text-[10px] mb-0.5">{selected.has(emp.id) ? '☑' : '☐'}</div>}
@@ -689,6 +723,34 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
     onRefresh();
   };
 
+  // 엑셀 다운로드
+  const handleDownloadExcel = () => {
+    const statusLabel: Record<string, string> = {
+      active: '재직', hiring: '채용필요', onboarding: '입사대기',
+      transfer: '이동예정', leave: '휴직', resigning: '퇴사예정', resigned: '퇴사',
+    };
+    const data = filtered.map(emp => ({
+      '이름': emp.name,
+      '영문명': emp.eng_name,
+      '이메일': emp.email || '',
+      '지점': (emp.branch as any)?.name || '미배정',
+      '상태': statusLabel[emp.status] || emp.status,
+      '입사일자': emp.hire_date || '',
+      '퇴사일자': emp.resign_date || '',
+      '직책명': getRole(emp) === 'Lead' ? '리드' : getRole(emp),
+      '사원코드': getCode(emp),
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '인원리스트');
+    // 컬럼 너비 자동
+    ws['!cols'] = [
+      { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 20 },
+      { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 10 },
+    ];
+    XLSX.writeFile(wb, `사원명부_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   // 정기이동 엑셀 업로드 (탭2 형식: 지점명, 이름, ROLE, 입사일)
   const handleTransferUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -820,6 +882,10 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
               <input type="file" accept=".xlsx,.xls" onChange={handleTransferUpload} className="hidden" />
             </label>
           )}
+          <button onClick={handleDownloadExcel}
+            className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">
+            <Download className="w-4 h-4" />엑셀 다운로드
+          </button>
           {canEdit && (
             <button onClick={() => { setMultiSelect(!multiSelect); setSelected(new Set()); }}
               className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition ${
@@ -853,6 +919,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
               <th className="text-left px-4 py-3 font-semibold">소속</th>
               <th className="text-center px-4 py-3 font-semibold">상태</th>
               <th className="text-left px-4 py-3 font-semibold">이메일</th>
+              <th className="text-center px-4 py-3 font-semibold">사원코드</th>
               <th className="text-center px-4 py-3 font-semibold">입사일</th>
               {canEdit && !multiSelect && <th className="text-center px-4 py-3 font-semibold w-24">관리</th>}
             </tr>
@@ -872,8 +939,8 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                      emp.status_note === '파트장' ? 'bg-indigo-100 text-indigo-700' :
-                      emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
+                      isPartjangRole(emp.status_note) ? 'bg-indigo-100 text-indigo-700' :
+                      isLeadRole(emp.status_note) ? 'bg-amber-100 text-amber-700' :
                       emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-emerald-100 text-emerald-700'
                     }`}>
                       {emp.eng_name.charAt(0)}
@@ -884,10 +951,10 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3 text-gray-600">{emp.eng_name}</td>
                 <td className="text-center px-3 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    emp.status_note === '파트장' ? 'bg-indigo-100 text-indigo-700' :
-                    emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
+                    isPartjangRole(emp.status_note) ? 'bg-indigo-100 text-indigo-700' :
+                    isLeadRole(emp.status_note) ? 'bg-amber-100 text-amber-700' :
                     emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
-                  }`}>{emp.status_note === '파트장' ? '파트장' : emp.status_note === 'Lead' ? '리드' : emp.is_hm ? 'HM' : '매니저'}</span>
+                  }`}>{getRole(emp) === '파트장' ? '파트장' : getRole(emp) === 'Lead' ? '리드' : emp.is_hm ? 'HM' : '매니저'}</span>
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{(emp.branch as any)?.name || '미배정'}</span>
@@ -904,6 +971,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                   }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status === 'resigning' ? '퇴사예정' : emp.status}</span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{emp.email || '-'}</td>
+                <td className="text-center px-4 py-3 text-gray-500 text-xs font-mono">{getCode(emp) || '-'}</td>
                 <td className="text-center px-4 py-3 text-gray-500 text-xs">{formatDate(emp.hire_date)}</td>
                 {canEdit && !multiSelect && (
                   <td className="px-4 py-3">
@@ -1012,22 +1080,18 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
 function EmpModal({ employee, branches, onClose, onSaved }: {
   employee?: Employee; branches: Branch[]; onClose: () => void; onSaved: () => void;
 }) {
-  const getRoleFromEmp = (e?: Employee) => {
-    if (!e) return 'Mgr';
-    if (e.status_note === '파트장') return '파트장';
-    if (e.status_note === 'Lead') return 'Lead';
-    if (e.is_hm) return 'HM';
-    return 'Mgr';
-  };
+  const empRole = employee ? getRole(employee) : '매니저';
+  const roleMap: Record<string, string> = { '파트장': '파트장', 'Lead': 'Lead', 'HM': 'HM', '매니저': 'Mgr' };
   const [form, setForm] = useState({
     name: employee?.name || '',
     eng_name: employee?.eng_name || '',
     email: employee?.email || '',
     branch_id: employee?.branch_id || '',
     status: employee?.status || 'active',
-    role: getRoleFromEmp(employee),
+    role: roleMap[empRole] || 'Mgr',
     hire_date: employee?.hire_date || '',
     resign_date: employee?.resign_date || '',
+    employee_code: employee ? getCode(employee) : '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -1035,7 +1099,8 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
     setSaving(true);
     const isHm = form.role === 'HM' || form.role === '파트장';
     const isLead = form.role === 'Lead';
-    const statusNote = form.role === '파트장' ? '파트장' : form.role === 'Lead' ? 'Lead' : '';
+    const roleStr = form.role === '파트장' ? '파트장' : form.role === 'Lead' ? 'Lead' : '';
+    const statusNote = buildNote(roleStr, form.employee_code);
 
     // 슬롯 자동배정: HM/파트장은 null, 매니저/리드는 빈 슬롯 찾아서 배정
     let slotNumber: number | null = null;
@@ -1092,6 +1157,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
             { k: 'name', l: '이름', ph: '홍길동' },
             { k: 'eng_name', l: '영문명', ph: 'Gildong' },
             { k: 'email', l: '이메일', ph: 'gildong.hong@handys.co.kr' },
+            { k: 'employee_code', l: '사원코드', ph: '22073' },
           ].map(f => (
             <div key={f.k}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{f.l}</label>
@@ -1644,6 +1710,7 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
           const hireDateIdx = headers.findIndex((h: string) => h === '입사일자' || h === '입사일' || h === 'hire_date');
           const resignDateIdx = headers.findIndex((h: string) => h === '퇴사일자' || h === '퇴사일' || h === 'resign_date');
           const titleIdx = headers.findIndex((h: string) => h === '직책명' || h === '직책' || h === 'title' || h === 'role');
+          const codeIdx = headers.findIndex((h: string) => h === '사원코드' || h === 'employee_code' || h === 'code');
 
           const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '퇴사예정': 'resigning', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
           const hmTitles = ['HM', 'Lead', '리드', '파트장'];
@@ -1653,6 +1720,7 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
             let roleNote = '';
             if (title === 'Lead' || title === '리드') roleNote = 'Lead';
             else if (title === '파트장') roleNote = '파트장';
+            const empCode = codeIdx >= 0 ? String(row[codeIdx] || '').trim() : '';
             return {
               name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
               eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
@@ -1662,7 +1730,7 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
               hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
               resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
               is_hm: hmTitles.includes(title),
-              status_note: roleNote,
+              status_note: buildNote(roleNote, empCode),
             };
           }).filter((i: any) => i.name || i.eng_name);
           setParsed(items);
