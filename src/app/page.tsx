@@ -431,7 +431,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                     <button onClick={() => handleSlotClick(hqBranch, slot.slotNum)}
                                       className="w-full px-3 py-2 bg-pink-50 border border-pink-300 rounded-xl text-center hover:shadow-md transition">
                                       <div className="text-sm font-bold text-pink-700">{emp.eng_name}</div>
-                                      {emp.status_note && <div className="text-[10px] text-gray-500">{emp.status_note}</div>}
+                                      <div className="text-[10px] text-gray-500">{getRole(emp) === '매니저' ? '' : getRole(emp) === 'Lead' ? 'LEAD' : getRole(emp)}</div>
                                     </button>
                                   ) : (
                                     <button onClick={() => handleSlotClick(hqBranch, slot.slotNum)}
@@ -512,14 +512,12 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                     <div className="text-[10px] text-gray-500 mt-0.5">{emp.name}</div>
                                     {(() => {
                                       const label =
-                                        emp.status === 'leave' ? '휴직중' :
-                                        emp.status === 'resigning' && emp.resign_date ? `퇴사 ${emp.resign_date.slice(5)}` :
+                                        emp.status === 'leave' ? '육아휴직중' :
+                                        emp.status === 'resigning' && emp.resign_date ? `퇴사예정 ${emp.resign_date.slice(5)}` :
                                         emp.status === 'resigning' ? '퇴사예정' :
-                                        emp.status === 'onboarding' && emp.hire_date ? `입사 ${emp.hire_date.slice(5)}` :
                                         emp.status === 'onboarding' ? '입사대기' :
                                         emp.status === 'transfer' ? '이동예정' :
-                                        emp.status === 'hiring' ? '' :
-                                        emp.hire_date ? `${emp.hire_date.slice(2,7)}입사` : '';
+                                        '';
                                       return label ? <div className="text-[9px] text-gray-400 mt-0.5">{label}</div> : null;
                                     })()}
                                   </button>
