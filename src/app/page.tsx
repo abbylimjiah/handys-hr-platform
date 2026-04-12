@@ -741,7 +741,8 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
       const emp = employees.find(e => e.eng_name.toLowerCase() === item.eng_name.toLowerCase());
       if (!emp) { notFound.push(item.eng_name); continue; }
 
-      const isLead = item.role === 'Lead' || item.role === '리드';
+      const isPartjang = item.role === '파트장';
+      const isLead = item.role === 'Lead' || item.role === '리드' || isPartjang;
       const isHm = item.role === 'HM' || isLead;
       matched.push({ emp, branch: branch || null, item, isHm, isLead });
     }
@@ -770,7 +771,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
         branch_id: m.branch ? m.branch.id : null,
         is_hm: m.isHm,
         slot_number: m.isHm ? null : (slotMap.get(m.emp.id) || null),
-        status_note: m.isLead ? 'Lead' : '',
+        status_note: m.item.role === '파트장' ? '파트장' : (m.item.role === 'Lead' || m.item.role === '리드') ? 'Lead' : '',
       };
       if (m.item.hire_date) payload.hire_date = m.item.hire_date;
 
@@ -858,6 +859,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      emp.status_note === '파트장' ? 'bg-indigo-100 text-indigo-700' :
                       emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
                       emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-emerald-100 text-emerald-700'
                     }`}>
@@ -869,9 +871,10 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 <td className="px-4 py-3 text-gray-600">{emp.eng_name}</td>
                 <td className="text-center px-3 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    emp.status_note === '파트장' ? 'bg-indigo-100 text-indigo-700' :
                     emp.status_note === 'Lead' ? 'bg-amber-100 text-amber-700' :
                     emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
-                  }`}>{emp.status_note === 'Lead' ? 'Lead' : emp.is_hm ? 'HM' : '매니저'}</span>
+                  }`}>{emp.status_note === '파트장' ? '파트장' : emp.status_note === 'Lead' ? '리드' : emp.is_hm ? 'HM' : '매니저'}</span>
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{(emp.branch as any)?.name || '미배정'}</span>
@@ -995,13 +998,20 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
 function EmpModal({ employee, branches, onClose, onSaved }: {
   employee?: Employee; branches: Branch[]; onClose: () => void; onSaved: () => void;
 }) {
+  const getRoleFromEmp = (e?: Employee) => {
+    if (!e) return 'Mgr';
+    if (e.status_note === '파트장') return '파트장';
+    if (e.status_note === 'Lead') return 'Lead';
+    if (e.is_hm) return 'HM';
+    return 'Mgr';
+  };
   const [form, setForm] = useState({
     name: employee?.name || '',
     eng_name: employee?.eng_name || '',
     email: employee?.email || '',
     branch_id: employee?.branch_id || '',
     status: employee?.status || 'active',
-    is_hm: employee?.is_hm || false,
+    role: getRoleFromEmp(employee),
     hire_date: employee?.hire_date || '',
     resign_date: employee?.resign_date || '',
   });
@@ -1009,9 +1019,16 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
+    const isHm = form.role === 'HM' || form.role === 'Lead' || form.role === '파트장';
+    const statusNote = form.role === '파트장' ? '파트장' : form.role === 'Lead' ? 'Lead' : '';
     const payload = {
-      ...form,
+      name: form.name,
+      eng_name: form.eng_name,
+      email: form.email,
       branch_id: form.branch_id || null,
+      status: form.status,
+      is_hm: isHm,
+      status_note: statusNote,
       hire_date: form.hire_date || null,
       resign_date: form.resign_date || null,
     };
@@ -1077,10 +1094,15 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="isHm" checked={form.is_hm} onChange={e => setForm(p => ({ ...p, is_hm: e.target.checked }))}
-              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-            <label htmlFor="isHm" className="text-sm text-gray-700">HM (Head Manager)</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">직책</label>
+            <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="Mgr">매니저</option>
+              <option value="HM">HM (Head Manager)</option>
+              <option value="Lead">리드</option>
+              <option value="파트장">파트장</option>
+            </select>
           </div>
         </div>
         <div className="flex gap-2 p-4 border-t">
@@ -1565,66 +1587,63 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
         setParsed(items);
       }
     } else if (ext === 'xlsx' || ext === 'xls') {
-      // Load SheetJS dynamically
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      script.onload = () => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const XLSX = (window as any).XLSX;
-          const wb = XLSX.read(ev.target?.result, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          if (data.length < 2) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const wb = XLSX.read(ev.target?.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (data.length < 2) return;
 
-          const headers = data[0].map((h: any) => String(h || '').trim().toLowerCase());
-          const rows = data.slice(1).filter((r: any[]) => r.some(c => c != null && c !== ''));
+        const headers = data[0].map((h: any) => String(h || '').trim().toLowerCase());
+        const rows = data.slice(1).filter((r: any[]) => r.some(c => c != null && c !== ''));
 
-          if (uploadType === 'employees') {
-            const nameIdx = headers.findIndex((h: string) => h === '이름' || h === 'name' || h === '한글명');
-            const engIdx = headers.findIndex((h: string) => h === '영문명' || h === 'eng_name' || h === 'english');
-            const emailIdx = headers.findIndex((h: string) => h === '이메일' || h === 'email');
-            const branchIdx = headers.findIndex((h: string) => h === '지점' || h === 'branch' || h === '지점명');
-            const statusIdx = headers.findIndex((h: string) => h === '상태' || h === 'status');
-            const hireDateIdx = headers.findIndex((h: string) => h === '입사일자' || h === '입사일' || h === 'hire_date');
-            const resignDateIdx = headers.findIndex((h: string) => h === '퇴사일자' || h === '퇴사일' || h === 'resign_date');
-            const titleIdx = headers.findIndex((h: string) => h === '직책명' || h === '직책' || h === 'title' || h === 'role');
+        if (uploadType === 'employees') {
+          const nameIdx = headers.findIndex((h: string) => h === '이름' || h === 'name' || h === '한글명');
+          const engIdx = headers.findIndex((h: string) => h === '영문명' || h === 'eng_name' || h === 'english');
+          const emailIdx = headers.findIndex((h: string) => h === '이메일' || h === 'email');
+          const branchIdx = headers.findIndex((h: string) => h === '지점' || h === 'branch' || h === '지점명');
+          const statusIdx = headers.findIndex((h: string) => h === '상태' || h === 'status');
+          const hireDateIdx = headers.findIndex((h: string) => h === '입사일자' || h === '입사일' || h === 'hire_date');
+          const resignDateIdx = headers.findIndex((h: string) => h === '퇴사일자' || h === '퇴사일' || h === 'resign_date');
+          const titleIdx = headers.findIndex((h: string) => h === '직책명' || h === '직책' || h === 'title' || h === 'role');
 
-            const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
+          const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
+          const hmTitles = ['HM', 'Lead', '리드', '파트장'];
 
-            const items = rows.map((row: any[]) => {
-              const title = titleIdx >= 0 ? String(row[titleIdx] || '').trim() : '';
-              return {
-                name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
-                eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
-                email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
-                branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
-                status: statusIdx >= 0 ? (statusMap[String(row[statusIdx] || '').trim()] || 'active') : 'active',
-                hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
-                resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
-                is_hm: title === 'HM' || title === 'Lead' || title === '리드',
-                status_note: (title === 'Lead' || title === '리드') ? 'Lead' : '',
-              };
-            }).filter((i: any) => i.name || i.eng_name);
-            setParsed(items);
-          } else {
-            const numIdx = headers.findIndex((h: string) => h === '번호' || h === 'num' || h === '#');
-            const nameIdx = headers.findIndex((h: string) => h === '지점명' || h === 'name' || h === '이름');
-            const regionIdx = headers.findIndex((h: string) => h === '지역' || h === 'region');
-            const toIdx = headers.findIndex((h: string) => h === 'to' || h === 'target');
-
-            const items = rows.map((row: any[]) => ({
-              branch_num: numIdx >= 0 ? Number(row[numIdx]) || 0 : 0,
+          const items = rows.map((row: any[]) => {
+            const title = titleIdx >= 0 ? String(row[titleIdx] || '').trim() : '';
+            let roleNote = '';
+            if (title === 'Lead' || title === '리드') roleNote = 'Lead';
+            else if (title === '파트장') roleNote = '파트장';
+            return {
               name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
-              region: regionIdx >= 0 ? String(row[regionIdx] || defaultRegion) : defaultRegion,
-              target_to: toIdx >= 0 ? Number(row[toIdx]) || 5 : 5,
-            })).filter((i: any) => i.name);
-            setParsed(items);
-          }
-        };
-        reader.readAsArrayBuffer(file);
+              eng_name: engIdx >= 0 ? String(row[engIdx] || '') : String(row[1] || ''),
+              email: emailIdx >= 0 ? String(row[emailIdx] || '') : '',
+              branch_name: branchIdx >= 0 ? String(row[branchIdx] || '') : '',
+              status: statusIdx >= 0 ? (statusMap[String(row[statusIdx] || '').trim()] || 'active') : 'active',
+              hire_date: hireDateIdx >= 0 ? String(row[hireDateIdx] || '') : '',
+              resign_date: resignDateIdx >= 0 ? String(row[resignDateIdx] || '') : '',
+              is_hm: hmTitles.includes(title),
+              status_note: roleNote,
+            };
+          }).filter((i: any) => i.name || i.eng_name);
+          setParsed(items);
+        } else {
+          const numIdx = headers.findIndex((h: string) => h === '번호' || h === 'num' || h === '#');
+          const nameIdx = headers.findIndex((h: string) => h === '지점명' || h === 'name' || h === '이름');
+          const regionIdx = headers.findIndex((h: string) => h === '지역' || h === 'region');
+          const toIdx = headers.findIndex((h: string) => h === 'to' || h === 'target');
+
+          const items = rows.map((row: any[]) => ({
+            branch_num: numIdx >= 0 ? Number(row[numIdx]) || 0 : 0,
+            name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
+            region: regionIdx >= 0 ? String(row[regionIdx] || defaultRegion) : defaultRegion,
+            target_to: toIdx >= 0 ? Number(row[toIdx]) || 5 : 5,
+          })).filter((i: any) => i.name);
+          setParsed(items);
+        }
       };
-      document.head.appendChild(script);
+      reader.readAsArrayBuffer(file);
     }
     e.target.value = '';
   };
@@ -1669,7 +1688,6 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
 
       for (const p of enriched) {
         const isHm = p.is_hm || false;
-        const isLead = p.status_note === 'Lead';
 
         const row: any = {
           name: p.name || '',
@@ -1679,7 +1697,7 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
           branch_id: p.branchId,
           is_hm: isHm,
           slot_number: isHm ? null : (p._slotNumber || null),
-          status_note: isLead ? 'Lead' : (p.status_note || ''),
+          status_note: p.status_note || '',
         };
         if (p.hire_date) row.hire_date = p.hire_date;
         if (p.resign_date) row.resign_date = p.resign_date;
