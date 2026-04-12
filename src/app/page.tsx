@@ -431,18 +431,19 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                           <td className="text-center px-1 py-1.5">
                             {br.hm ? (
                               <button onClick={() => handleHmClick(br)}
-                                className={`w-full min-h-[40px] px-2 py-1 border rounded-lg text-xs font-medium transition hover:shadow-md ${
+                                className={`w-full min-h-[44px] px-2 py-1.5 border rounded-xl text-center text-xs transition hover:shadow-lg hover:-translate-y-0.5 ${
                                   multiSelect && selected.has(br.hm!.id)
                                     ? 'bg-red-100 border-red-500 text-red-700 ring-2 ring-red-400'
                                     : 'bg-pink-50 border-pink-300 text-pink-700'
                                 }`}>
-                                {multiSelect && <span className="mr-1">{selected.has(br.hm!.id) ? '☑' : '☐'}</span>}
-                                {br.hm.eng_name}
+                                {multiSelect && <div className="text-[10px] mb-0.5">{selected.has(br.hm!.id) ? '☑' : '☐'}</div>}
+                                <div className="font-bold text-[13px]">{br.hm.eng_name}</div>
+                                <div className="text-[10px] text-pink-500 mt-0.5">{br.hm.name}</div>
                               </button>
                             ) : (
                               <button onClick={() => handleHmClick(br)}
-                                className="w-full h-10 border border-dashed border-gray-300 rounded-lg text-gray-300 hover:border-pink-400 hover:text-pink-400 hover:bg-pink-50 transition flex items-center justify-center">
-                                <Plus className="w-3 h-3" />
+                                className="w-full h-11 border-2 border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-pink-400 hover:text-pink-400 hover:bg-pink-50 transition flex items-center justify-center">
+                                <Plus className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </td>
@@ -452,25 +453,25 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                               <td key={slotNum} className="px-1 py-1.5">
                                 {emp ? (
                                   <button onClick={() => handleSlotClick(br, slotNum)}
-                                    className={`w-full min-h-[40px] px-2 py-1 border rounded-lg text-left text-xs leading-tight transition hover:shadow-md ${
+                                    className={`w-full min-h-[44px] px-2 py-1.5 border rounded-xl text-center text-xs leading-tight transition hover:shadow-lg hover:-translate-y-0.5 ${
                                       multiSelect && selected.has(emp.id)
                                         ? 'bg-red-100 border-red-500 text-red-700 ring-2 ring-red-400' :
                                       emp.status === 'hiring' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' :
                                       emp.status === 'onboarding' ? 'bg-blue-50 border-blue-400 text-blue-800' :
                                       emp.status === 'transfer' ? 'bg-purple-50 border-purple-400 text-purple-800' :
                                       emp.status === 'leave' ? 'bg-green-50 border-green-400 text-green-800' :
-                                      'bg-white border-gray-200'
+                                      emp.status_note === 'Lead' ? 'bg-amber-50 border-amber-300 text-amber-800' :
+                                      'bg-emerald-50 border-emerald-200 text-gray-800'
                                     }`}>
-                                    <div className="font-medium">
-                                      {multiSelect && <span className="mr-1">{selected.has(emp.id) ? '☑' : '☐'}</span>}
-                                      {emp.eng_name}
-                                    </div>
-                                    {emp.status_note && <div className="text-gray-500 text-[10px]">{emp.status_note}</div>}
+                                    {multiSelect && <div className="text-[10px] mb-0.5">{selected.has(emp.id) ? '☑' : '☐'}</div>}
+                                    <div className="font-bold text-[13px]">{emp.eng_name}</div>
+                                    <div className="text-[10px] text-gray-500 mt-0.5">{emp.name}</div>
+                                    {emp.status_note && <div className="text-[9px] text-gray-400 mt-0.5">{emp.status_note}</div>}
                                   </button>
                                 ) : (
                                   <button onClick={() => handleSlotClick(br, slotNum)}
-                                    className="w-full h-10 border border-dashed border-gray-300 rounded-lg text-gray-300 hover:border-emerald-400 hover:text-emerald-400 hover:bg-emerald-50 transition flex items-center justify-center">
-                                    <Plus className="w-3 h-3" />
+                                    className="w-full h-11 border-2 border-dashed border-gray-200 rounded-xl text-gray-300 hover:border-emerald-400 hover:text-emerald-400 hover:bg-emerald-50 transition flex items-center justify-center">
+                                    <Plus className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                               </td>
