@@ -216,6 +216,9 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   const [region, setRegion] = useState('전체');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<{ branch: Branch; slotNum: number; employee?: Employee } | null>(null);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set()); // employee IDs
+  const [bulkRemoving, setBulkRemoving] = useState(false);
   const regions = ['전체', 'HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
   const regionOrder = ['HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
 
@@ -258,7 +261,43 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
   const handleSlotClick = (branch: Branch, slotNum: number) => {
     if (!canEdit) return;
     const emp = employees.find(e => e.branch_id === branch.id && e.slot_number === slotNum && e.status !== 'resigned');
+    if (multiSelect && emp) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        if (next.has(emp.id)) next.delete(emp.id); else next.add(emp.id);
+        return next;
+      });
+      return;
+    }
     setModal({ branch, slotNum, employee: emp });
+  };
+
+  const handleHmClick = (branch: Branch & { hm?: Employee }) => {
+    if (!canEdit) return;
+    if (multiSelect && branch.hm) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        if (next.has(branch.hm!.id)) next.delete(branch.hm!.id); else next.add(branch.hm!.id);
+        return next;
+      });
+      return;
+    }
+    setModal({ branch, slotNum: 0, employee: branch.hm });
+  };
+
+  const handleBulkRemove = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`선택한 ${selected.size}명을 슬롯에서 제거하시겠습니까?`)) return;
+    setBulkRemoving(true);
+    const ids = Array.from(selected);
+    const { error } = await supabase.from('employees').update({
+      branch_id: null, slot_number: null, is_hm: false
+    }).in('id', ids);
+    if (error) { alert('제거 실패: ' + error.message); }
+    setBulkRemoving(false);
+    setSelected(new Set());
+    setMultiSelect(false);
+    onRefresh();
   };
 
   return (
@@ -287,6 +326,12 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
               region === r ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'
             }`}>{r}</button>
         ))}
+        <div className="ml-auto">
+          <button onClick={() => { setMultiSelect(!multiSelect); setSelected(new Set()); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${
+              multiSelect ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'
+            }`}>{multiSelect ? '선택 취소' : '다중 선택'}</button>
+        </div>
       </div>
 
       {/* Table */}
@@ -384,12 +429,17 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                           </td>
                           <td className="text-center px-1 py-1.5">
                             {br.hm ? (
-                              <button onClick={() => setModal({ branch: br, slotNum: 0, employee: br.hm })}
-                                className="w-full min-h-[40px] px-2 py-1 bg-pink-50 border border-pink-300 rounded-lg text-xs font-medium text-pink-700 transition hover:shadow-md">
+                              <button onClick={() => handleHmClick(br)}
+                                className={`w-full min-h-[40px] px-2 py-1 border rounded-lg text-xs font-medium transition hover:shadow-md ${
+                                  multiSelect && selected.has(br.hm!.id)
+                                    ? 'bg-red-100 border-red-500 text-red-700 ring-2 ring-red-400'
+                                    : 'bg-pink-50 border-pink-300 text-pink-700'
+                                }`}>
+                                {multiSelect && <span className="mr-1">{selected.has(br.hm!.id) ? '☑' : '☐'}</span>}
                                 {br.hm.eng_name}
                               </button>
                             ) : (
-                              <button onClick={() => setModal({ branch: br, slotNum: 0 })}
+                              <button onClick={() => handleHmClick(br)}
                                 className="w-full h-10 border border-dashed border-gray-300 rounded-lg text-gray-300 hover:border-pink-400 hover:text-pink-400 hover:bg-pink-50 transition flex items-center justify-center">
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -402,13 +452,18 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                 {emp ? (
                                   <button onClick={() => handleSlotClick(br, slotNum)}
                                     className={`w-full min-h-[40px] px-2 py-1 border rounded-lg text-left text-xs leading-tight transition hover:shadow-md ${
+                                      multiSelect && selected.has(emp.id)
+                                        ? 'bg-red-100 border-red-500 text-red-700 ring-2 ring-red-400' :
                                       emp.status === 'hiring' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' :
                                       emp.status === 'onboarding' ? 'bg-blue-50 border-blue-400 text-blue-800' :
                                       emp.status === 'transfer' ? 'bg-purple-50 border-purple-400 text-purple-800' :
                                       emp.status === 'leave' ? 'bg-green-50 border-green-400 text-green-800' :
                                       'bg-white border-gray-200'
                                     }`}>
-                                    <div className="font-medium">{emp.eng_name}</div>
+                                    <div className="font-medium">
+                                      {multiSelect && <span className="mr-1">{selected.has(emp.id) ? '☑' : '☐'}</span>}
+                                      {emp.eng_name}
+                                    </div>
                                     {emp.status_note && <div className="text-gray-500 text-[10px]">{emp.status_note}</div>}
                                   </button>
                                 ) : (
@@ -435,6 +490,19 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
           </table>
         </div>
       </div>
+
+      {/* Multi-select floating bar */}
+      {multiSelect && selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-40">
+          <span className="text-sm font-medium">{selected.size}명 선택</span>
+          <button onClick={handleBulkRemove} disabled={bulkRemoving}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+            <Trash2 className="w-4 h-4" />{bulkRemoving ? '제거 중...' : '일괄 제거'}
+          </button>
+          <button onClick={() => { setSelected(new Set()); setMultiSelect(false); }}
+            className="px-3 py-2 text-sm text-gray-300 hover:text-white">취소</button>
+        </div>
+      )}
 
       {/* Slot Modal */}
       {modal && (
