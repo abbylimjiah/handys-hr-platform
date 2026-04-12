@@ -1019,8 +1019,30 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
-    const isHm = form.role === 'HM' || form.role === 'Lead' || form.role === '파트장';
+    const isHm = form.role === 'HM' || form.role === '파트장';
+    const isLead = form.role === 'Lead';
     const statusNote = form.role === '파트장' ? '파트장' : form.role === 'Lead' ? 'Lead' : '';
+
+    // 슬롯 자동배정: HM/파트장은 null, 매니저/리드는 빈 슬롯 찾아서 배정
+    let slotNumber: number | null = null;
+    if (!isHm && form.branch_id) {
+      // 해당 지점의 기존 슬롯 조회
+      const { data: existing } = await supabase.from('employees')
+        .select('slot_number')
+        .eq('branch_id', form.branch_id)
+        .not('slot_number', 'is', null)
+        .order('slot_number');
+      const usedSlots = new Set((existing || []).map(e => e.slot_number));
+      // 수정 중이면 자기 슬롯은 제외
+      if (employee?.slot_number && employee.branch_id === Number(form.branch_id)) {
+        usedSlots.delete(employee.slot_number);
+      }
+      // 빈 슬롯 찾기 (1부터)
+      let s = 1;
+      while (usedSlots.has(s)) s++;
+      slotNumber = s;
+    }
+
     const payload = {
       name: form.name,
       eng_name: form.eng_name,
@@ -1028,6 +1050,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
       branch_id: form.branch_id || null,
       status: form.status,
       is_hm: isHm,
+      slot_number: isHm ? null : slotNumber,
       status_note: statusNote,
       hire_date: form.hire_date || null,
       resign_date: form.resign_date || null,
