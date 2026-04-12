@@ -511,8 +511,8 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                       emp.status === 'hiring' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' :
                                       emp.status === 'onboarding' ? 'bg-blue-50 border-blue-400 text-blue-800' :
                                       emp.status === 'transfer' ? 'bg-purple-50 border-purple-400 text-purple-800' :
-                                      emp.status === 'leave' ? 'bg-teal-100 border-teal-500 text-teal-900 ring-1 ring-teal-300' :
-                                      emp.status === 'resigning' ? 'bg-orange-50 border-orange-400 text-orange-800' :
+                                      emp.status === 'leave' ? 'bg-cyan-200 border-cyan-600 text-cyan-900 ring-2 ring-cyan-400 font-bold' :
+                                      emp.status === 'resigning' ? 'bg-red-200 border-red-600 text-red-900 ring-2 ring-red-400 font-bold' :
                                       isLeadRole(emp.status_note) ? 'bg-amber-50 border-amber-300 text-amber-800' :
                                       'bg-emerald-50 border-emerald-200 text-gray-800'
                                     }`}>
