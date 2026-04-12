@@ -1074,7 +1074,7 @@ function BulkUploadSection() {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ success: number; fail: number; errors: string[] } | null>(null);
   const [defaultRegion, setDefaultRegion] = useState('HQ');
-  const regions = ['HQ', 'ê°ì', 'ê²½ê¸°', 'ë¶ì¸ê²½', 'ìì¸', 'ì¸ì²', 'ì ì£¼'];
+  const regions = ['HQ', '강원', '경기', '부울경', '서울', '인천', '제주'];
 
   const parseEmployees = (text: string) => {
     const items: { name: string; eng_name: string }[] = [];
@@ -1133,11 +1133,11 @@ function BulkUploadSection() {
       const rows = lines.slice(1);
 
       if (uploadType === 'employees') {
-        const nameIdx = headers.findIndex(h => h === 'ì´ë¦' || h === 'name' || h === 'íê¸ëª');
-        const engIdx = headers.findIndex(h => h === 'ìë¬¸ëª' || h === 'eng_name' || h === 'english' || h === 'ìë¬¸ì´ë¦');
-        const emailIdx = headers.findIndex(h => h === 'ì´ë©ì¼' || h === 'email');
-        const branchIdx = headers.findIndex(h => h === 'ì§ì ' || h === 'branch' || h === 'ì§ì ëª');
-        const statusIdx = headers.findIndex(h => h === 'ìí' || h === 'status');
+        const nameIdx = headers.findIndex(h => h === '이름' || h === 'name' || h === '한글명');
+        const engIdx = headers.findIndex(h => h === '영문명' || h === 'eng_name' || h === 'english' || h === '영문이름');
+        const emailIdx = headers.findIndex(h => h === '이메일' || h === 'email');
+        const branchIdx = headers.findIndex(h => h === '지점' || h === 'branch' || h === '지점명');
+        const statusIdx = headers.findIndex(h => h === '상태' || h === 'status');
 
         const items = rows.map(row => {
           const cols = row.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
@@ -1151,10 +1151,10 @@ function BulkUploadSection() {
         }).filter(i => i.name || i.eng_name);
         setParsed(items);
       } else {
-        const numIdx = headers.findIndex(h => h === 'ë²í¸' || h === 'num' || h === 'branch_num' || h === '#');
-        const nameIdx = headers.findIndex(h => h === 'ì§ì ëª' || h === 'name' || h === 'ì´ë¦');
-        const regionIdx = headers.findIndex(h => h === 'ì§ì­' || h === 'region');
-        const toIdx = headers.findIndex(h => h === 'to' || h === 'target' || h === 'ëª©íì¸ì');
+        const numIdx = headers.findIndex(h => h === '번호' || h === 'num' || h === 'branch_num' || h === '#');
+        const nameIdx = headers.findIndex(h => h === '지점명' || h === 'name' || h === '이름');
+        const regionIdx = headers.findIndex(h => h === '지역' || h === 'region');
+        const toIdx = headers.findIndex(h => h === 'to' || h === 'target' || h === '목표인원');
 
         const items = rows.map(row => {
           const cols = row.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
@@ -1184,10 +1184,10 @@ function BulkUploadSection() {
           const rows = data.slice(1).filter((r: any[]) => r.some(c => c != null && c !== ''));
 
           if (uploadType === 'employees') {
-            const nameIdx = headers.findIndex((h: string) => h === 'ì´ë¦' || h === 'name' || h === 'íê¸ëª');
-            const engIdx = headers.findIndex((h: string) => h === 'ìë¬¸ëª' || h === 'eng_name' || h === 'english');
-            const emailIdx = headers.findIndex((h: string) => h === 'ì´ë©ì¼' || h === 'email');
-            const branchIdx = headers.findIndex((h: string) => h === 'ì§ì ' || h === 'branch' || h === 'ì§ì ëª');
+            const nameIdx = headers.findIndex((h: string) => h === '이름' || h === 'name' || h === '한글명');
+            const engIdx = headers.findIndex((h: string) => h === '영문명' || h === 'eng_name' || h === 'english');
+            const emailIdx = headers.findIndex((h: string) => h === '이메일' || h === 'email');
+            const branchIdx = headers.findIndex((h: string) => h === '지점' || h === 'branch' || h === '지점명');
 
             const items = rows.map((row: any[]) => ({
               name: nameIdx >= 0 ? String(row[nameIdx] || '') : String(row[0] || ''),
@@ -1198,9 +1198,9 @@ function BulkUploadSection() {
             })).filter((i: any) => i.name || i.eng_name);
             setParsed(items);
           } else {
-            const numIdx = headers.findIndex((h: string) => h === 'ë²í¸' || h === 'num' || h === '#');
-            const nameIdx = headers.findIndex((h: string) => h === 'ì§ì ëª' || h === 'name' || h === 'ì´ë¦');
-            const regionIdx = headers.findIndex((h: string) => h === 'ì§ì­' || h === 'region');
+            const numIdx = headers.findIndex((h: string) => h === '번호' || h === 'num' || h === '#');
+            const nameIdx = headers.findIndex((h: string) => h === '지점명' || h === 'name' || h === '이름');
+            const regionIdx = headers.findIndex((h: string) => h === '지역' || h === 'region');
             const toIdx = headers.findIndex((h: string) => h === 'to' || h === 'target');
 
             const items = rows.map((row: any[]) => ({
@@ -1264,17 +1264,17 @@ function BulkUploadSection() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">ì¼ê´ ìë¡ë</h2>
-          <p className="text-sm text-gray-500">ìì/CSV íì¼ ëë íì¤í¼ë¡ ë°ì´í°ë¥¼ íë²ì ë±ë¡</p>
+          <h2 className="text-lg font-bold text-gray-900">일괄 업로드</h2>
+          <p className="text-sm text-gray-500">엑셀/CSV 파일 또는 텍스튼로 데이터를 한번에 등록</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => { setUploadType('employees'); setParsed([]); setResult(null); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'employees' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
-            <Users className="w-3.5 h-3.5 inline mr-1" />ì¸ì
+            <Users className="w-3.5 h-3.5 inline mr-1" />인원
           </button>
           <button onClick={() => { setUploadType('branches'); setParsed([]); setResult(null); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${uploadType === 'branches' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border'}`}>
-            <MapPin className="w-3.5 h-3.5 inline mr-1" />ì§ì 
+            <MapPin className="w-3.5 h-3.5 inline mr-1" />지점
           </button>
         </div>
       </div>
@@ -1283,11 +1283,11 @@ function BulkUploadSection() {
       <div className="flex gap-2 mb-3">
         <button onClick={() => setInputMode('file')}
           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${inputMode === 'file' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}>
-          <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1" />íì¼ ìë¡ë
+          <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1" />파일 업로드
         </button>
         <button onClick={() => setInputMode('text')}
           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${inputMode === 'text' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}>
-          <Edit3 className="w-3.5 h-3.5 inline mr-1" />íì¤í¸ ë¶ì¬ë£ê¸°
+          <Edit3 className="w-3.5 h-3.5 inline mr-1" />텍스트 붙여넣기
         </button>
       </div>
 
@@ -1295,24 +1295,24 @@ function BulkUploadSection() {
       {inputMode === 'file' && (
         <div className="bg-white rounded-xl border p-4 mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {uploadType === 'employees' ? 'ì¸ì íì¼ ìë¡ë' : 'ì§ì  íì¼ ìë¡ë'}
+            {uploadType === 'employees' ? '인원 파일 업로드' : '지점 파일 업로드'}
           </label>
           <p className="text-xs text-gray-400 mb-3">
             {uploadType === 'employees'
-              ? 'ìì/CSV íì¼ (ì»¬ë¼: ì´ë¦, ìë¬¸ëª, ì´ë©ì¼, ì§ì , ìí)'
-              : 'ìì/CSV íì¼ (ì»¬ë¼: ë²í¸, ì§ì ëª, ì§ì­, TO)'}
+              ? '엑셀/CSV 파일 (컬럼: 이름, 영문명, 이메일, 지점, 상태)'
+              : '엑셀/CSV 파일 (컬럼: 번호, 지점명, 지역, TO)'}
           </p>
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-emerald-400 transition relative">
             <FileSpreadsheet className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 mb-1">xlsx, csv, tsv íì¼ì ì ííì¸ì</p>
-            <p className="text-xs text-gray-400">ì²«ë²ì§¸ íì´ í¤ë(ì»¬ë¼ëª)ì¬ì¼ í©ëë¤</p>
+            <p className="text-sm text-gray-500 mb-1">xlsx, csv, tsv 파일을 선택하세요</p>
+            <p className="text-xs text-gray-400">첫번째 행이 헤더(컬럼명)여야 합니다</p>
             <input type="file" accept=".xlsx,.xls,.csv,.tsv"
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer" />
           </div>
           {uploadType === 'branches' && (
             <div className="mt-3 flex items-center gap-2">
-              <label className="text-xs text-gray-500">íì¼ì ì§ì­ ì»¬ë¼ì´ ìì ê²½ì° ê¸°ë³¸ ì§ì­:</label>
+              <label className="text-xs text-gray-500">파일에 지역 컬럼이 없을 경우 기본 지역:</label>
               <select value={defaultRegion} onChange={e => setDefaultRegion(e.target.value)}
                 className="text-xs border rounded px-2 py-1">
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
@@ -1326,19 +1326,19 @@ function BulkUploadSection() {
       {inputMode === 'text' && (
         <div className="bg-white rounded-xl border p-4 mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            {uploadType === 'employees' ? 'ì¸ì ë°ì´í° ë¶ì¬ë£ê¸°' : 'ì§ì  ë°ì´í° ë¶ì¬ë£ê¸°'}
+            {uploadType === 'employees' ? '인원 데이터 붙여넣기' : '지점 데이터 붙여넣기'}
           </label>
           <p className="text-xs text-gray-400 mb-2">
             {uploadType === 'employees'
-              ? 'íì: ì´ë¦,ìë¬¸ëª (ì¤ë°ê¿/í­/ì¼í) ëë ì°ìíì¤í¸ (íê¸¸ëGildongê¹ìí¬Young...)'
-              : 'íì: ë²í¸,ì§ì ëª (ì¤ë°ê¿/í­/ì¼í) ëë ì°ìíì¤í¸ (1HQ2ìë©´4ëªë...)'}
+              ? '형식: 이름,영문명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (홍길동Gildong김영희Young...)'
+              : '형식: 번호,지점명 (줄바꿈/탭/쉼표) 또는 연속텍스트 (1HQ2서면4명동...)'}
           </p>
           <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
             rows={8} className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-y"
-            placeholder={uploadType === 'employees' ? 'ì°ë¯¼ì£¼MJ\nì´ì¸ìClaire\n...' : '1HQ\n2ìë©´\n4ëªë\n...'} />
+            placeholder={uploadType === 'employees' ? '우민주MJ\n이세아Claire\n...' : '1HQ\n2서면\n4명동\n...'} />
           {uploadType === 'branches' && (
             <div className="mt-2 flex items-center gap-2">
-              <label className="text-xs text-gray-500">ê¸°ë³¸ ì§ì­:</label>
+              <label className="text-xs text-gray-500">기본 지역:</label>
               <select value={defaultRegion} onChange={e => setDefaultRegion(e.target.value)}
                 className="text-xs border rounded px-2 py-1">
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
@@ -1348,11 +1348,11 @@ function BulkUploadSection() {
           <div className="flex gap-2 mt-3">
             <button onClick={handleParse} disabled={!textInput.trim()}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              ë¯¸ë¦¬ë³´ê¸° íì±
+              미리보기 파싱
             </button>
             {parsed.length > 0 && (
               <button onClick={() => { setParsed([]); setResult(null); }}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">ì´ê¸°í</button>
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">초기화</button>
             )}
           </div>
         </div>
@@ -1362,10 +1362,10 @@ function BulkUploadSection() {
       {parsed.length > 0 && (
         <div className="bg-white rounded-xl border overflow-hidden mb-4">
           <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">íì± ê²°ê³¼: {parsed.length}ê±´</span>
+            <span className="text-sm font-medium text-gray-700">파싱 결과: {parsed.length}건</span>
             <button onClick={handleUpload} disabled={uploading}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50">
-              <Upload className="w-4 h-4" />{uploading ? 'ìë¡ë ì¤...' : `${parsed.length}ê±´ ì¼ê´ ë±ë¡`}
+              <Upload className="w-4 h-4" />{uploading ? '업로드 중...' : `${parsed.length}건 일괄 등록`}
             </button>
           </div>
           <div className="max-h-80 overflow-y-auto">
@@ -1373,13 +1373,13 @@ function BulkUploadSection() {
               <thead><tr className="bg-gray-50 border-b sticky top-0">
                 {uploadType === 'employees' ? (
                   <><th className="text-left px-4 py-2 font-semibold">#</th>
-                    <th className="text-left px-4 py-2 font-semibold">ì´ë¦</th>
-                    <th className="text-left px-4 py-2 font-semibold">ìë¬¸ëª</th>
-                    <th className="text-center px-4 py-2 font-semibold w-16">ì­ì </th></>
+                    <th className="text-left px-4 py-2 font-semibold">이름</th>
+                    <th className="text-left px-4 py-2 font-semibold">영문명</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
                 ) : (
-                  <><th className="text-center px-4 py-2 font-semibold w-16">ë²í¸</th>
-                    <th className="text-left px-4 py-2 font-semibold">ì§ì ëª</th>
-                    <th className="text-center px-4 py-2 font-semibold w-16">ì­ì </th></>
+                  <><th className="text-center px-4 py-2 font-semibold w-16">번호</th>
+                    <th className="text-left px-4 py-2 font-semibold">지점명</th>
+                    <th className="text-center px-4 py-2 font-semibold w-16">삭제</th></>
                 )}
               </tr></thead>
               <tbody>
@@ -1408,8 +1408,8 @@ function BulkUploadSection() {
       {result && (
         <div className={`rounded-xl border p-4 ${result.fail > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
           <div className="flex items-center gap-3 mb-2">
-            <span className="text-sm font-bold text-emerald-700">ì±ê³µ: {result.success}ê±´</span>
-            {result.fail > 0 && <span className="text-sm font-bold text-red-600">ì¤í¨: {result.fail}ê±´</span>}
+            <span className="text-sm font-bold text-emerald-700">성공: {result.success}건</span>
+            {result.fail > 0 && <span className="text-sm font-bold text-red-600">실패: {result.fail}건</span>}
           </div>
           {result.errors.length > 0 && (
             <div className="text-xs text-red-600 space-y-1 mt-2">
