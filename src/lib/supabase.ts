@@ -21,7 +21,7 @@ export type Employee = {
   eng_name: string;
   email: string | null;
   branch_id: number | null;
-  status: 'active' | 'hiring' | 'onboarding' | 'transfer' | 'leave' | 'resigned';
+  status: 'active' | 'hiring' | 'onboarding' | 'transfer' | 'leave' | 'resigning' | 'resigned';
   slot_number: number | null;
   is_hm: boolean;
   hire_date: string | null;

@@ -242,6 +242,13 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
       if (!groups[b.region]) groups[b.region] = [];
       const emps = employees.filter(e => e.branch_id === b.id && e.status !== 'resigned');
       const hm = emps.find(e => e.is_hm);
+      // 매니저만 입사일순 정렬 → 슬롯 재배정 (HM 제외)
+      const mgrs = emps.filter(e => !e.is_hm).sort((a, b) => {
+        const da = a.hire_date || '9999';
+        const db = b.hire_date || '9999';
+        return da.localeCompare(db);
+      });
+      mgrs.forEach((e, idx) => { (e as any).slot_number = idx + 1; });
       groups[b.region].push({ ...b, emps, hm });
     });
     // Sort: HQ first, then alphabetical by regionOrder
@@ -460,6 +467,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
                                       emp.status === 'onboarding' ? 'bg-blue-50 border-blue-400 text-blue-800' :
                                       emp.status === 'transfer' ? 'bg-purple-50 border-purple-400 text-purple-800' :
                                       emp.status === 'leave' ? 'bg-green-50 border-green-400 text-green-800' :
+                                      emp.status === 'resigning' ? 'bg-orange-50 border-orange-400 text-orange-800' :
                                       emp.status_note === 'Lead' ? 'bg-amber-50 border-amber-300 text-amber-800' :
                                       'bg-emerald-50 border-emerald-200 text-gray-800'
                                     }`}>
@@ -531,7 +539,9 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
   const handleSave = async () => {
     setSaving(true);
     const payload = {
-      eng_name: engName, name, status, status_note: note,
+      eng_name: engName || (status === 'hiring' ? '채용필요' : ''),
+      name: name || (status === 'hiring' ? '채용필요' : ''),
+      status, status_note: note,
       branch_id: branch.id,
       slot_number: isHmSlot ? null : slotNum,
       is_hm: isHmSlot || false,
@@ -562,7 +572,7 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
   const statusOptions = [
     { key: 'active', label: '재직' }, { key: 'hiring', label: '채용필요' },
     { key: 'onboarding', label: '입사대기' }, { key: 'transfer', label: '이동예정' },
-    { key: 'leave', label: '휴직/육아' },
+    { key: 'leave', label: '휴직/육아' }, { key: 'resigning', label: '퇴사예정' },
   ];
 
   return (
@@ -603,7 +613,7 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
         <div className="p-4 border-t space-y-2">
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
-            <button onClick={handleSave} disabled={saving || !engName}
+            <button onClick={handleSave} disabled={saving || (!engName && status !== 'hiring')}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
               <Save className="w-4 h-4" />{saving ? '저장중...' : '저장'}
             </button>
@@ -887,8 +897,9 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                     emp.status === 'onboarding' ? 'bg-blue-100 text-blue-700' :
                     emp.status === 'transfer' ? 'bg-purple-100 text-purple-700' :
                     emp.status === 'leave' ? 'bg-green-100 text-green-700' :
+                    emp.status === 'resigning' ? 'bg-orange-100 text-orange-700' :
                     'bg-gray-100 text-gray-600'
-                  }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status}</span>
+                  }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status === 'resigning' ? '퇴사예정' : emp.status}</span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{emp.email || '-'}</td>
                 <td className="text-center px-4 py-3 text-gray-500 text-xs">{formatDate(emp.hire_date)}</td>
@@ -1103,6 +1114,7 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
               <option value="onboarding">입사대기</option>
               <option value="transfer">이동예정</option>
               <option value="leave">휴직</option>
+              <option value="resigning">퇴사예정</option>
               <option value="resigned">퇴사</option>
             </select>
           </div>
@@ -1194,7 +1206,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              {['지역','지점수','기줔TO','현인원','과부족','채용필요','입사대기','이동예정','충월율'].map(h =>
+              {['지역','지점 번호','고정TO','현인원','과부족','채용필요','입사대기','이동예정','충원율'].map(h =>
                 <th key={h} className={`${h==='지역'?'text-left':'text-center'} px-4 py-3 font-semibold`}>{h}</th>
               )}
             </tr>
@@ -1631,7 +1643,7 @@ function BulkUploadSection({ branches }: { branches: Branch[] }) {
           const resignDateIdx = headers.findIndex((h: string) => h === '퇴사일자' || h === '퇴사일' || h === 'resign_date');
           const titleIdx = headers.findIndex((h: string) => h === '직책명' || h === '직책' || h === 'title' || h === 'role');
 
-          const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
+          const statusMap: Record<string, string> = { '재직': 'active', '휴직': 'leave', '퇴사': 'resigned', '퇴사예정': 'resigning', '채용필요': 'hiring', '입사대기': 'onboarding', '이동예정': 'transfer' };
           const hmTitles = ['HM', 'Lead', '리드', '파트장'];
 
           const items = rows.map((row: any[]) => {
