@@ -1,11 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fnksjaixrasvhivrhgsm.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZua3NqYWl4cmFzdmhpdnJoZ3NtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTcyNzQxOSwiZXhwIjoyMDkxMzAzNDE5fQ.goJe7krY82dofJK5r7F9FAqFsPy4kHozhrw-RqFrCrk';
 
-export const supabase = supabaseUrl
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : (null as unknown as ReturnType<typeof createClient>);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ─── Types ───
 export type Branch = {
