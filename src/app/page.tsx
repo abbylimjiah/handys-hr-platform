@@ -5,8 +5,9 @@ import { supabase, signInWithMagicLink, signOut, getUserRole } from '@/lib/supab
 import type { Branch, Employee, UserRole } from '@/lib/supabase';
 import {
   Search, Plus, Edit3, Trash2, Users, BarChart3, LayoutGrid, Settings,
-  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin, FileSpreadsheet
+  ChevronDown, ChevronRight, X, Save, Filter, LogOut, Shield, Upload, MapPin, FileSpreadsheet, RefreshCw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // ─── Main Page ───
 export default function Home() {
@@ -626,6 +627,8 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
   const [multiSelect, setMultiSelect] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [transferUploading, setTransferUploading] = useState(false);
+  const [transferPreview, setTransferPreview] = useState<any[] | null>(null);
 
   const filtered = useMemo(() => {
     const active = employees.filter(e => e.status !== 'resigned');
@@ -673,6 +676,98 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
     onRefresh();
   };
 
+  // 정기이동 엑셀 업로드 (탭2 형식: 지점명, 이름, ROLE, 입사일)
+  const handleTransferUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const wb = XLSX.read(evt.target?.result, { type: 'binary' });
+      // 두번째 시트(탭2) 우선, 없으면 첫번째
+      const sheetName = wb.SheetNames.length > 1 ? wb.SheetNames[1] : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      // 헤더 행 찾기 (지점명 포함된 행)
+      let headerIdx = rows.findIndex(r => r.some((c: any) => typeof c === 'string' && c.includes('지점명')));
+      if (headerIdx < 0) headerIdx = 0;
+
+      const parsed: { branch_name: string; eng_name: string; role: string; hire_date?: string }[] = [];
+      for (let i = headerIdx + 1; i < rows.length; i++) {
+        const row = rows[i];
+        const branchName = row[1]?.toString?.()?.trim();
+        const engName = row[2]?.toString?.()?.trim();
+        const role = row[3]?.toString?.()?.trim();
+        if (!branchName) continue;
+        // 날짜 처리
+        let hireDate: string | undefined;
+        if (row[4]) {
+          if (typeof row[4] === 'number') {
+            const d = XLSX.SSF.parse_date_code(row[4]);
+            hireDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+          } else {
+            hireDate = row[4].toString();
+          }
+        }
+        parsed.push({ branch_name: branchName, eng_name: engName || '', role: role || '', hire_date: hireDate });
+      }
+      setTransferPreview(parsed);
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  const executeTransfer = async () => {
+    if (!transferPreview) return;
+    setTransferUploading(true);
+    let updated = 0, notFound: string[] = [], branchNotFound: string[] = [];
+
+    for (const item of transferPreview) {
+      if (!item.eng_name) continue; // 빈 슬롯 스킵
+      // 지점 매칭 (부분 매칭)
+      const branch = branches.find(b =>
+        b.name === item.branch_name ||
+        b.name.replace(/\s/g, '') === item.branch_name.replace(/\s/g, '') ||
+        b.name.includes(item.branch_name) ||
+        item.branch_name.includes(b.name)
+      );
+      if (!branch && item.branch_name !== 'HQ') {
+        if (!branchNotFound.includes(item.branch_name)) branchNotFound.push(item.branch_name);
+        continue;
+      }
+      // 직원 매칭 (영문명)
+      const emp = employees.find(e =>
+        e.eng_name.toLowerCase() === item.eng_name.toLowerCase()
+      );
+      if (!emp) {
+        notFound.push(item.eng_name);
+        continue;
+      }
+      // 업데이트
+      const payload: any = {
+        branch_id: branch ? branch.id : null,
+        is_hm: item.role === 'HM',
+      };
+      if (item.hire_date) payload.hire_date = item.hire_date;
+
+      const { error } = await supabase.from('employees').update(payload).eq('id', emp.id);
+      if (!error) updated++;
+    }
+
+    let msg = `✅ ${updated}명 이동 완료!`;
+    if (notFound.length > 0) msg += `\n\n⚠️ 매칭 안된 이름 (${notFound.length}명):\n${notFound.join(', ')}`;
+    if (branchNotFound.length > 0) msg += `\n\n⚠️ 매칭 안된 지점:\n${branchNotFound.join(', ')}`;
+    alert(msg);
+    setTransferUploading(false);
+    setTransferPreview(null);
+    onRefresh();
+  };
+
+  const formatDate = (d: string | null) => {
+    if (!d) return '-';
+    return d.substring(0, 10);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -681,6 +776,12 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
           <p className="text-sm text-gray-500">총 {filtered.length}명 (퇴사 제외)</p>
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <label className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer transition">
+              <RefreshCw className="w-4 h-4" />정기이동 업로드
+              <input type="file" accept=".xlsx,.xls" onChange={handleTransferUpload} className="hidden" />
+            </label>
+          )}
           {canEdit && (
             <button onClick={() => { setMultiSelect(!multiSelect); setSelected(new Set()); }}
               className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition ${
@@ -698,7 +799,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <div className="bg-white rounded-xl border overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
@@ -710,9 +811,11 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
               )}
               <th className="text-left px-4 py-3 font-semibold">이름</th>
               <th className="text-left px-4 py-3 font-semibold">영문명</th>
-              <th className="text-left px-4 py-3 font-semibold">이메일</th>
+              <th className="text-center px-3 py-3 font-semibold">직책</th>
               <th className="text-left px-4 py-3 font-semibold">소속</th>
               <th className="text-center px-4 py-3 font-semibold">상태</th>
+              <th className="text-left px-4 py-3 font-semibold">이메일</th>
+              <th className="text-center px-4 py-3 font-semibold">입사일</th>
               {canEdit && !multiSelect && <th className="text-center px-4 py-3 font-semibold w-24">관리</th>}
             </tr>
           </thead>
@@ -730,16 +833,22 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                 )}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-xs font-bold text-emerald-700">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
                       {emp.eng_name.charAt(0)}
                     </div>
                     <span className="font-medium text-gray-900">{emp.name}</span>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{emp.eng_name}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{emp.email || '-'}</td>
+                <td className="text-center px-3 py-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    emp.is_hm ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'
+                  }`}>{emp.is_hm ? 'HM' : '매니저'}</span>
+                </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{(emp.branch as any)?.name || '-'}</span>
+                  <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{(emp.branch as any)?.name || '미배정'}</span>
                 </td>
                 <td className="text-center px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -751,6 +860,8 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
                     'bg-gray-100 text-gray-600'
                   }`}>{emp.status === 'active' ? '재직' : emp.status === 'hiring' ? '채용필요' : emp.status === 'onboarding' ? '입사대기' : emp.status === 'transfer' ? '이동예정' : emp.status === 'leave' ? '휴직' : emp.status}</span>
                 </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{emp.email || '-'}</td>
+                <td className="text-center px-4 py-3 text-gray-500 text-xs">{formatDate(emp.hire_date)}</td>
                 {canEdit && !multiSelect && (
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
@@ -778,6 +889,71 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
         </div>
       )}
 
+      {/* 정기이동 미리보기 모달 */}
+      {transferPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="font-bold text-gray-900">🔄 정기이동 미리보기</h3>
+                <p className="text-sm text-gray-500 mt-1">총 {transferPreview.filter(t => t.eng_name).length}명 배치 변경</p>
+              </div>
+              <button onClick={() => setTransferPreview(null)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b text-xs">
+                    <th className="text-left px-3 py-2">지점</th>
+                    <th className="text-left px-3 py-2">이름</th>
+                    <th className="text-center px-3 py-2">ROLE</th>
+                    <th className="text-center px-3 py-2">입사일</th>
+                    <th className="text-center px-3 py-2">매칭</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transferPreview.filter(t => t.eng_name).map((item, i) => {
+                    const emp = employees.find(e => e.eng_name.toLowerCase() === item.eng_name.toLowerCase());
+                    const branch = branches.find(b =>
+                      b.name === item.branch_name || b.name.replace(/\s/g,'') === item.branch_name.replace(/\s/g,'') ||
+                      b.name.includes(item.branch_name) || item.branch_name.includes(b.name)
+                    );
+                    return (
+                      <tr key={i} className="border-b">
+                        <td className="px-3 py-2">
+                          <span className={`text-xs px-2 py-0.5 rounded ${branch ? 'bg-blue-50 text-blue-700' : item.branch_name === 'HQ' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                            {item.branch_name}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-medium">{item.eng_name}</td>
+                        <td className="text-center px-3 py-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${item.role === 'HM' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {item.role}
+                          </span>
+                        </td>
+                        <td className="text-center px-3 py-2 text-gray-500 text-xs">{item.hire_date || '-'}</td>
+                        <td className="text-center px-3 py-2">
+                          {emp ? <span className="text-emerald-600">✓</span> : <span className="text-red-500">✗</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 p-4 border-t">
+              <button onClick={() => setTransferPreview(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
+              <button onClick={executeTransfer} disabled={transferUploading}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                <RefreshCw className={`w-4 h-4 ${transferUploading ? 'animate-spin' : ''}`} />
+                {transferUploading ? '이동 처리 중...' : '이동 실행'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal && (
         <EmpModal
           employee={modal === 'new' ? undefined : modal}
@@ -800,12 +976,19 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
     branch_id: employee?.branch_id || '',
     status: employee?.status || 'active',
     is_hm: employee?.is_hm || false,
+    hire_date: employee?.hire_date || '',
+    resign_date: employee?.resign_date || '',
   });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    const payload = { ...form, branch_id: form.branch_id || null };
+    const payload = {
+      ...form,
+      branch_id: form.branch_id || null,
+      hire_date: form.hire_date || null,
+      resign_date: form.resign_date || null,
+    };
     if (employee) {
       const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
       if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
@@ -843,6 +1026,30 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
               <option value="">미배정</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+            <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as any }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="active">재직</option>
+              <option value="hiring">채용필요</option>
+              <option value="onboarding">입사대기</option>
+              <option value="transfer">이동예정</option>
+              <option value="leave">휴직</option>
+              <option value="resigned">퇴사</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">입사일</label>
+              <input type="date" value={form.hire_date} onChange={e => setForm(p => ({ ...p, hire_date: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">퇴사일</label>
+              <input type="date" value={form.resign_date} onChange={e => setForm(p => ({ ...p, resign_date: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="isHm" checked={form.is_hm} onChange={e => setForm(p => ({ ...p, is_hm: e.target.checked }))}
