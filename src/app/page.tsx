@@ -65,12 +65,7 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
-    // service_role 키 사용 → 인증 불필요, RLS 우회
-    setUser({ email: 'abby.lim@handys.co.kr' });
-    setUserRole({ email: 'abby.lim@handys.co.kr', role: 'admin', name: 'Abby' });
-    setLoading(false);
-    return;
-
+    // 🔐 publishable key + RLS → 실제 Supabase 인증 필요
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user?.email) {
