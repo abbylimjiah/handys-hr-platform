@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fnksjaixrasvhivrhgsm.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZua3NqYWl4cmFzdmhpdnJoZ3NtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTcyNzQxOSwiZXhwIjoyMDkxMzAzNDE5fQ.goJe7krY82dofJK5r7F9FAqFsPy4kHozhrw-RqFrCrk';
+// 🔒 환경변수에서만 읽음 — 키를 코드에 박지 말 것!
+// NEXT_PUBLIC_* 접두사 env vars는 빌드 시 클라이언트 번들에 포함됨.
+// .env.local(로컬) 또는 배포 환경변수(Vercel)에 설정.
+// ⚠️ service_role 키 절대 금지 — 반드시 anon public 키만 사용!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Supabase 환경변수 미설정. .env.local 확인 필요.');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
 // ─── Types ───
 export type Branch = {
