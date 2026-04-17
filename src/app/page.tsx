@@ -65,22 +65,14 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
-    // 🔐 publishable key + RLS → 실제 Supabase 인증 필요
-    // Safety net: never stay stuck on loading — max 3s before falling through to login screen
-    const safetyTimer = setTimeout(() => setLoading(false), 3000);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.email) {
-        getUserRole(session.user.email).then(setUserRole);
-      }
-      clearTimeout(safetyTimer);
-      setLoading(false);
-    }).catch((err) => {
-      console.error('getSession failed:', err);
-      clearTimeout(safetyTimer);
-      setLoading(false);
-    });
+    // ⚠️ 로그인 우회 — Supabase 무료 플랜 이메일 rate limit (시간당 2통) 때문에
+    // 매직링크 인증이 실용적이지 않아서 의도적으로 Abby를 기본 어드민으로 설정.
+    // RLS는 anon 읽기/쓰기를 허용하도록 설정되어 있음 (migration.sql 참조).
+    // 사이트 URL이 비공개이므로 실질적인 접근 제어는 URL 비공개성에 의존.
+    setUser({ email: 'abby.lim@handys.co.kr' });
+    setUserRole({ email: 'abby.lim@handys.co.kr', role: 'admin', name: 'Abby' });
+    setLoading(false);
+    return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
