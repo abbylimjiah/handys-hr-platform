@@ -66,11 +66,19 @@ export default function Home() {
 
   useEffect(() => {
     // 🔐 publishable key + RLS → 실제 Supabase 인증 필요
+    // Safety net: never stay stuck on loading — max 3s before falling through to login screen
+    const safetyTimer = setTimeout(() => setLoading(false), 3000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user?.email) {
         getUserRole(session.user.email).then(setUserRole);
       }
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    }).catch((err) => {
+      console.error('getSession failed:', err);
+      clearTimeout(safetyTimer);
       setLoading(false);
     });
 
