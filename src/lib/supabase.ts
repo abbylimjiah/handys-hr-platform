@@ -11,7 +11,16 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn('⚠️ Supabase 환경변수 미설정. .env.local 확인 필요.');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+// 🔓 Web Lock 비활성화 — 여러 요청이 동시 auth 호출 시 "lock stolen" 에러 방지
+// (Supabase JS v2의 알려진 이슈: https://github.com/supabase/supabase-js/issues/936)
+export const supabase = createClient(supabaseUrl || '', supabaseKey || '', {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    lock: async (_name, _acquireTimeout, fn) => await fn(),
+  },
+});
 
 // ─── Types ───
 export type Branch = {
