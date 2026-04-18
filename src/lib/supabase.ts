@@ -157,6 +157,16 @@ export async function signInWithMagicLink(email: string) {
   if (error) throw error;
 }
 
+// 비밀번호 로그인 (매직링크 rate limit 우회용 기본 방식)
+export async function signInWithPassword(email: string, password: string) {
+  if (!email.endsWith('@handys.co.kr')) {
+    throw new Error('@handys.co.kr 이메일만 사용 가능합니다.');
+  }
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase, signInWithMagicLink, signOut, getUserRole } from '@/lib/supabase';
+import { supabase, signInWithPassword, signOut, getUserRole } from '@/lib/supabase';
 import type { Branch, Employee, UserRole } from '@/lib/supabase';
 import {
   Search, Plus, Edit3, Trash2, Users, BarChart3, LayoutGrid, Settings,
@@ -65,23 +65,38 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
-    // ⚠️ 로그인 우회 — Supabase 무료 플랜 이메일 rate limit (시간당 2통) 때문에
-    // 매직링크 인증이 실용적이지 않아서 의도적으로 Abby를 기본 어드민으로 설정.
-    // RLS는 anon 읽기/쓰기를 허용하도록 설정되어 있음 (migration.sql 참조).
-    // 사이트 URL이 비공개이므로 실질적인 접근 제어는 URL 비공개성에 의존.
-    setUser({ email: 'abby.lim@handys.co.kr' });
-    setUserRole({ email: 'abby.lim@handys.co.kr', role: 'admin', name: 'Abby' });
-    setLoading(false);
-    return;
+    // 🔐 이메일+비밀번호 로그인 (Supabase Auth)
+    // 로그인 성공 시 user_roles 테이블에서 역할 조회
+    const safetyTimer = setTimeout(() => setLoading(false), 3000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user?.email) {
-        getUserRole(session.user.email).then(setUserRole);
+        const role = await getUserRole(session.user.email);
+        setUserRole(role);
+      }
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    }).catch((err) => {
+      console.error('getSession failed:', err);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user?.email) {
+        const role = await getUserRole(session.user.email);
+        setUserRole(role);
+      } else {
+        setUserRole(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadData = useCallback(async () => {
@@ -99,7 +114,7 @@ export default function Home() {
 
   // Login screen states (must be before any early returns per Rules of Hooks)
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginSent, setLoginSent] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -109,15 +124,17 @@ export default function Home() {
   if (loading) return <div className="flex items-center justify-center h-screen"><div className="text-gray-500">Loading...</div></div>;
 
 
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setLoginLoading(true);
     try {
-      await signInWithMagicLink(loginEmail);
-      setLoginSent(true);
+      await signInWithPassword(loginEmail, loginPassword);
+      // onAuthStateChange가 자동으로 user/userRole 업데이트
     } catch (err: any) {
-      setLoginError(err.message || '로그인 요청에 실패했습니다.');
+      setLoginError(err.message === 'Invalid login credentials'
+        ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+        : (err.message || '로그인에 실패했습니다.'));
     } finally {
       setLoginLoading(false);
     }
@@ -132,36 +149,35 @@ export default function Home() {
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-1">핸디즈 인사관리</h1>
           <p className="text-sm text-gray-500 mb-6">운영지원팀 전용 플랫폼</p>
-          {loginSent ? (
-            <div>
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-600"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4z"/></svg>
-              </div>
-              <p className="text-sm text-gray-700 font-medium mb-1">로그인 링크를 발송했습니다</p>
-              <p className="text-xs text-gray-500 mb-4">{loginEmail} 받은편지함을 확인하세요</p>
-              <button onClick={() => { setLoginSent(false); setLoginEmail(''); }} className="text-xs text-emerald-600 hover:underline">다른 이메일로 다시 시도</button>
-            </div>
-          ) : (
-            <form onSubmit={handleMagicLink}>
-              <input
-                type="email"
-                placeholder="name@handys.co.kr"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                required
-              />
-              {loginError && <p className="text-xs text-red-500 mb-2">{loginError}</p>}
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
-              >
-                {loginLoading ? '발송 중...' : '로그인 링크 받기'}
-              </button>
-            </form>
-          )}
-          <p className="text-xs text-gray-400 mt-4">@handys.co.kr 계정만 접근 가능</p>
+          <form onSubmit={handlePasswordLogin}>
+            <input
+              type="email"
+              placeholder="name@handys.co.kr"
+              value={loginEmail}
+              onChange={(e) => setLoginEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              required
+              autoComplete="email"
+            />
+            <input
+              type="password"
+              placeholder="비밀번호"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              required
+              autoComplete="current-password"
+            />
+            {loginError && <p className="text-xs text-red-500 mb-2">{loginError}</p>}
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
+            >
+              {loginLoading ? '로그인 중...' : '로그인'}
+            </button>
+          </form>
+          <p className="text-xs text-gray-400 mt-4">등록된 @handys.co.kr 계정만 접근 가능</p>
         </div>
       </div>
     );
