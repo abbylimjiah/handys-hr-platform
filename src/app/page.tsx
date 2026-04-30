@@ -57,49 +57,78 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [tab, setTab] = useState('board');
   const [search, setSearch] = useState('');
+  const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
 
   // Data
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
+    const handler = (e: any) => setToast(e.detail);
+    window.addEventListener('hr:toast', handler);
+    return () => window.removeEventListener('hr:toast', handler);
+  }, []);
+
+  useEffect(() => {
     // 🔐 이메일+비밀번호 로그인 (Supabase Auth)
     // 로그인 성공 시 user_roles 테이블에서 역할 조회
+    let cancelled = false;
     const safetyTimer = setTimeout(() => setLoading(false), 3000);
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.email) {
-        const role = await getUserRole(session.user.email);
-        setUserRole(role);
+    const applySession = async (session: any) => {
+      if (cancelled) return;
+      const sessUser = session?.user ?? null;
+      setUser(sessUser);
+      if (sessUser?.email) {
+        setRoleLoading(true);
+        try {
+          const role = await getUserRole(sessUser.email);
+          if (cancelled) return;
+          setUserRole(role);
+        } finally {
+          if (!cancelled) setRoleLoading(false);
+        }
+      } else {
+        setUserRole(null);
+        setRoleLoading(false);
       }
+    };
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      await applySession(session);
+      if (cancelled) return;
       clearTimeout(safetyTimer);
       setLoading(false);
     }).catch((err) => {
       console.error('getSession failed:', err);
+      if (cancelled) return;
       clearTimeout(safetyTimer);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.email) {
-        const role = await getUserRole(session.user.email);
-        setUserRole(role);
-      } else {
-        setUserRole(null);
-      }
+      await applySession(session);
     });
 
     return () => {
+      cancelled = true;
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
 
   const loadData = useCallback(async () => {
+    // 세션이 storage에서 완전히 복원된 후 쿼리 (RLS 누락 방지)
+    await supabase.auth.getSession();
     const [{ data: b }, { data: e }] = await Promise.all([
       supabase.from('branches').select('*').order('region').order('name'),
       supabase.from('employees').select('*, branch:branches(*)').order('name'),
@@ -112,9 +141,6 @@ export default function Home() {
     if (user && userRole) loadData();
   }, [user, userRole, loadData]);
 
-  // Login screen states (must be before any early returns per Rules of Hooks)
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -124,13 +150,35 @@ export default function Home() {
   if (loading) return <div className="flex items-center justify-center h-screen"><div className="text-gray-500">Loading...</div></div>;
 
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // 비제어(uncontrolled) 입력 — 브라우저 자동완성/패스워드매니저가 React state에
+    // 반영되지 않아 첫 시도가 빈 값으로 전송되는 문제 방지
+    const fd = new FormData(e.currentTarget);
+    const email = ((fd.get('email') as string) || '').trim();
+    const password = (fd.get('password') as string) || '';
+    if (!email || !password) {
+      setLoginError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
     setLoginError('');
     setLoginLoading(true);
     try {
-      await signInWithPassword(loginEmail, loginPassword);
-      // onAuthStateChange가 자동으로 user/userRole 업데이트
+      const { session } = await signInWithPassword(email, password);
+      // onAuthStateChange도 트리거되지만, 첫 렌더 사이의 race로 "권한 없음"이
+      // 깜빡이는 것을 막기 위해 명시적으로도 한 번 적용
+      if (session?.user) {
+        setUser(session.user);
+        if (session.user.email) {
+          setRoleLoading(true);
+          try {
+            const role = await getUserRole(session.user.email);
+            setUserRole(role);
+          } finally {
+            setRoleLoading(false);
+          }
+        }
+      }
     } catch (err: any) {
       setLoginError(err.message === 'Invalid login credentials'
         ? '이메일 또는 비밀번호가 올바르지 않습니다.'
@@ -152,18 +200,16 @@ export default function Home() {
           <form onSubmit={handlePasswordLogin}>
             <input
               type="email"
+              name="email"
               placeholder="name@handys.co.kr"
-              value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
               autoComplete="email"
             />
             <input
               type="password"
+              name="password"
               placeholder="비밀번호"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
               autoComplete="current-password"
@@ -181,6 +227,11 @@ export default function Home() {
         </div>
       </div>
     );
+  }
+
+  // 역할 조회 중 — "권한 없음" 깜빡임 방지
+  if (!userRole && roleLoading) {
+    return <div className="flex items-center justify-center h-screen"><div className="text-gray-500">권한 확인 중...</div></div>;
   }
 
   // No role assigned
@@ -206,6 +257,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium text-white ${
+          toast.tone === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50 shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4">
@@ -266,7 +324,7 @@ export default function Home() {
 
 // ─── Board View ───
 function BoardView({ branches, employees, search, canEdit, onRefresh }: {
-  branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => void;
+  branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => Promise<void>;
 }) {
   const [region, setRegion] = useState('전체');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -575,7 +633,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
         <SlotModal
           branch={modal.branch} slotNum={modal.slotNum} employee={modal.employee}
           isHmSlot={modal.slotNum === 0}
-          employees={employees} onClose={() => setModal(null)} onSaved={() => { setModal(null); onRefresh(); }}
+          employees={employees} onClose={() => setModal(null)} onSaved={async () => { await onRefresh(); setModal(null); }}
         />
       )}
     </div>
@@ -584,7 +642,7 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
 
 function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, onSaved }: {
   branch: Branch; slotNum: number; employee?: Employee; isHmSlot?: boolean;
-  employees: Employee[]; onClose: () => void; onSaved: () => void;
+  employees: Employee[]; onClose: () => void; onSaved: () => void | Promise<void>;
 }) {
   const [engName, setEngName] = useState(employee?.eng_name || '');
   const [name, setName] = useState(employee?.name || '');
@@ -606,27 +664,38 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
       slot_number: isHmSlot ? null : slotNum,
       is_hm: isHmSlot || false,
     };
+    // 저장 전 세션 상태 확인 — 첫 mutation이 인증 헤더 없이 나가는 race 방지
+    await supabase.auth.getSession();
     if (employee) {
       const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
-      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
     } else {
       const { error } = await supabase.from('employees').insert(payload);
-      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
     }
-    onSaved();
-    setSaving(false);
+    try {
+      await onSaved();
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장되었습니다', tone: 'success' } }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!employee) return;
     if (!confirm(`${employee.eng_name || employee.name}을(를) 이 슬롯에서 제거하시겠습니까?`)) return;
     setSaving(true);
+    await supabase.auth.getSession();
     const { error } = await supabase.from('employees').update({
       branch_id: null, slot_number: null, is_hm: false
     }).eq('id', employee.id);
-    if (error) { alert('제거 실패: ' + error.message); setSaving(false); return; }
-    onSaved();
-    setSaving(false);
+    if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '제거 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
+    try {
+      await onSaved();
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '슬롯에서 제거됨', tone: 'success' } }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const statusOptions = [
@@ -692,7 +761,7 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
 
 // ─── Roster View ───
 function RosterView({ branches, employees, search, canEdit, onRefresh }: {
-  branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => void;
+  branches: Branch[]; employees: Employee[]; search: string; canEdit: boolean; onRefresh: () => Promise<void>;
 }) {
   const [modal, setModal] = useState<Employee | 'new' | null>(null);
   const [multiSelect, setMultiSelect] = useState(false);
@@ -1094,7 +1163,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
           employee={modal === 'new' ? undefined : modal}
           branches={branches}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); onRefresh(); }}
+          onSaved={async () => { await onRefresh(); setModal(null); }}
         />
       )}
     </div>
@@ -1102,7 +1171,7 @@ function RosterView({ branches, employees, search, canEdit, onRefresh }: {
 }
 
 function EmpModal({ employee, branches, onClose, onSaved }: {
-  employee?: Employee; branches: Branch[]; onClose: () => void; onSaved: () => void;
+  employee?: Employee; branches: Branch[]; onClose: () => void; onSaved: () => void | Promise<void>;
 }) {
   const empRole = employee ? getRole(employee) : '매니저';
   const roleMap: Record<string, string> = { '파트장': '파트장', 'Lead': 'Lead', 'HM': 'HM', '매니저': 'Mgr' };
@@ -1159,15 +1228,20 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
       hire_date: form.hire_date || null,
       resign_date: form.resign_date || null,
     };
+    await supabase.auth.getSession();
     if (employee) {
       const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
-      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
     } else {
       const { error } = await supabase.from('employees').insert(payload);
-      if (error) { alert('저장 실패: ' + error.message); setSaving(false); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
     }
-    onSaved();
-    setSaving(false);
+    try {
+      await onSaved();
+      window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: employee ? '수정되었습니다' : '등록되었습니다', tone: 'success' } }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -1509,14 +1583,17 @@ function BranchManageSection() {
 
   const handleSave = async () => {
     const payload = { branch_num: Number(form.branch_num), name: form.name, region: form.region, target_to: Number(form.target_to), note: form.note };
+    await supabase.auth.getSession();
     if (editId) {
       const { error } = await supabase.from('branches').update(payload).eq('id', editId);
-      if (error) { alert('수정 실패: ' + error.message); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '수정 실패: ' + error.message, tone: 'error' } })); return; }
     } else {
       const { error } = await supabase.from('branches').insert(payload);
-      if (error) { alert('추가 실패: ' + error.message); return; }
+      if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '추가 실패: ' + error.message, tone: 'error' } })); return; }
     }
-    resetForm(); loadBranches();
+    await loadBranches();
+    resetForm();
+    window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: editId ? '수정되었습니다' : '추가되었습니다', tone: 'success' } }));
   };
 
   const handleEdit = (b: Branch) => {
