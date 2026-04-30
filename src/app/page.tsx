@@ -127,8 +127,6 @@ export default function Home() {
   }, []);
 
   const loadData = useCallback(async () => {
-    // 세션이 storage에서 완전히 복원된 후 쿼리 (RLS 누락 방지)
-    await supabase.auth.getSession();
     const [{ data: b }, { data: e }] = await Promise.all([
       supabase.from('branches').select('*').order('region').order('name'),
       supabase.from('employees').select('*, branch:branches(*)').order('name'),
@@ -664,8 +662,6 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
       slot_number: isHmSlot ? null : slotNum,
       is_hm: isHmSlot || false,
     };
-    // 저장 전 세션 상태 확인 — 첫 mutation이 인증 헤더 없이 나가는 race 방지
-    await supabase.auth.getSession();
     if (employee) {
       const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
       if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
@@ -685,7 +681,6 @@ function SlotModal({ branch, slotNum, employee, isHmSlot, employees, onClose, on
     if (!employee) return;
     if (!confirm(`${employee.eng_name || employee.name}을(를) 이 슬롯에서 제거하시겠습니까?`)) return;
     setSaving(true);
-    await supabase.auth.getSession();
     const { error } = await supabase.from('employees').update({
       branch_id: null, slot_number: null, is_hm: false
     }).eq('id', employee.id);
@@ -1228,7 +1223,6 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
       hire_date: form.hire_date || null,
       resign_date: form.resign_date || null,
     };
-    await supabase.auth.getSession();
     if (employee) {
       const { error } = await supabase.from('employees').update(payload).eq('id', employee.id);
       if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '저장 실패: ' + error.message, tone: 'error' } })); setSaving(false); return; }
@@ -1583,7 +1577,6 @@ function BranchManageSection() {
 
   const handleSave = async () => {
     const payload = { branch_num: Number(form.branch_num), name: form.name, region: form.region, target_to: Number(form.target_to), note: form.note };
-    await supabase.auth.getSession();
     if (editId) {
       const { error } = await supabase.from('branches').update(payload).eq('id', editId);
       if (error) { window.dispatchEvent(new CustomEvent('hr:toast', { detail: { msg: '수정 실패: ' + error.message, tone: 'error' } })); return; }
