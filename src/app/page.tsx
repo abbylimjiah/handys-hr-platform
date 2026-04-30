@@ -372,9 +372,10 @@ function BoardView({ branches, employees, search, canEdit, onRefresh }: {
 
   const stats = useMemo(() => {
     const totalTO = branches.reduce((s, b) => s + b.target_to, 0);
-    const activeEmps = employees.filter(e => e.status !== 'resigned');
-    const filled = activeEmps.filter(e => e.status !== 'hiring').length;
-    const hiring = activeEmps.filter(e => e.status === 'hiring').length;
+    const branchIds = new Set(branches.map(b => b.id));
+    const assignedEmps = employees.filter(e => e.status !== 'resigned' && e.branch_id != null && branchIds.has(e.branch_id));
+    const filled = assignedEmps.filter(e => e.status !== 'hiring').length;
+    const hiring = assignedEmps.filter(e => e.status === 'hiring').length;
     return { totalTO, filled, hiring, vacancy: totalTO - filled };
   }, [branches, employees]);
 
@@ -1316,24 +1317,35 @@ function EmpModal({ employee, branches, onClose, onSaved }: {
 
 // ─── Summary View ───
 function SummaryView({ branches, employees }: { branches: Branch[]; employees: Employee[] }) {
-  const regionStats = useMemo(() => {
+  const { regionStats, unassigned, resigningTotal } = useMemo(() => {
     const stats: Record<string, { branches: number; to: number; filled: number; hiring: number; onboarding: number; transfer: number; leave: number }> = {};
     branches.forEach(b => {
       if (!stats[b.region]) stats[b.region] = { branches: 0, to: 0, filled: 0, hiring: 0, onboarding: 0, transfer: 0, leave: 0 };
       stats[b.region].branches++;
       stats[b.region].to += b.target_to;
     });
+    const unassigned = { count: 0, filled: 0, hiring: 0, onboarding: 0, transfer: 0, leave: 0 };
+    let resigningTotal = 0;
+    const branchMap = new Map(branches.map(b => [b.id, b]));
     employees.filter(e => e.status !== 'resigned').forEach(e => {
-      if (!e.branch_id) return;
-      const br = branches.find(b => b.id === e.branch_id);
-      if (!br || !stats[br.region]) return;
+      if (e.status === 'resigning') resigningTotal++;
+      const br = e.branch_id != null ? branchMap.get(e.branch_id) : undefined;
+      if (!br || !stats[br.region]) {
+        unassigned.count++;
+        if (e.status !== 'hiring') unassigned.filled++;
+        if (e.status === 'hiring') unassigned.hiring++;
+        if (e.status === 'onboarding') unassigned.onboarding++;
+        if (e.status === 'transfer') unassigned.transfer++;
+        if (e.status === 'leave') unassigned.leave++;
+        return;
+      }
       if (e.status !== 'hiring') stats[br.region].filled++;
       if (e.status === 'hiring') stats[br.region].hiring++;
       if (e.status === 'onboarding') stats[br.region].onboarding++;
       if (e.status === 'transfer') stats[br.region].transfer++;
       if (e.status === 'leave') stats[br.region].leave++;
     });
-    return stats;
+    return { regionStats: stats, unassigned, resigningTotal };
   }, [branches, employees]);
 
   const total = useMemo(() =>
@@ -1347,7 +1359,7 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-4">인원 현황 요약</h2>
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-3 mb-6">
         {[
           { l: '총 지점', v: total.branches, u: '개', bg: 'bg-gray-50' },
           { l: '총 TO', v: total.to, u: '명', bg: 'bg-gray-50' },
@@ -1355,6 +1367,8 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
           { l: '채용 필요', v: total.hiring, u: '명', bg: 'bg-red-50', c: 'text-red-700' },
           { l: '입사 대기', v: total.onboarding, u: '명', bg: 'bg-blue-50', c: 'text-blue-700' },
           { l: '이동 예정', v: total.transfer, u: '명', bg: 'bg-purple-50', c: 'text-purple-700' },
+          { l: '퇴사 예정', v: resigningTotal, u: '명', bg: 'bg-orange-50', c: 'text-orange-700' },
+          { l: '미배정', v: unassigned.count, u: '명', bg: 'bg-amber-50', c: 'text-amber-700' },
         ].map(card => (
           <div key={card.l} className={`${card.bg} rounded-xl p-4 border`}>
             <div className="text-xs text-gray-500 mb-1">{card.l}</div>
@@ -1397,6 +1411,19 @@ function SummaryView({ branches, employees }: { branches: Branch[]; employees: E
                 </tr>
               );
             })}
+            {unassigned.count > 0 && (
+              <tr className="border-b bg-amber-50/40 hover:bg-amber-50">
+                <td className="px-4 py-3 font-medium text-amber-800">미배정</td>
+                <td className="text-center px-4 py-3 text-gray-400">-</td>
+                <td className="text-center px-4 py-3 text-gray-400">-</td>
+                <td className="text-center px-4 py-3 font-bold text-emerald-600">{unassigned.filled || '-'}</td>
+                <td className="text-center px-4 py-3 text-gray-400">-</td>
+                <td className="text-center px-4 py-3">{unassigned.hiring > 0 && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">{unassigned.hiring}</span>}</td>
+                <td className="text-center px-4 py-3">{unassigned.onboarding > 0 && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium">{unassigned.onboarding}</span>}</td>
+                <td className="text-center px-4 py-3">{unassigned.transfer > 0 && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium">{unassigned.transfer}</span>}</td>
+                <td className="text-center px-4 py-3 text-gray-400">-</td>
+              </tr>
+            )}
           </tbody>
           <tfoot>
             <tr className="bg-gray-50 border-t-2 border-gray-300">
